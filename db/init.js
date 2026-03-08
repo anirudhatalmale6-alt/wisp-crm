@@ -141,7 +141,7 @@ module.exports = function(db) {
 
   // Default settings
   const defaults = [
-    ['company_name', 'Mi WISP', 'Nombre de la empresa'],
+    ['company_name', 'RYV Comunicaciones', 'Nombre de la empresa'],
     ['company_phone', '', 'Teléfono de la empresa'],
     ['currency', 'RD$', 'Símbolo de moneda'],
     ['tax_rate', '0', 'Porcentaje de impuesto (ITBIS)'],
