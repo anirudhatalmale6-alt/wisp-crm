@@ -44,11 +44,17 @@ module.exports = function(db) {
     installation_date DATE,
     billing_day INTEGER DEFAULT 1,
     status TEXT DEFAULT 'active',
+    latitude REAL,
+    longitude REAL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plan_id) REFERENCES plans(id)
   )`);
+
+  // Add lat/lng columns if they don't exist (migration for existing DBs)
+  try { db.exec('ALTER TABLE clients ADD COLUMN latitude REAL'); } catch(e) {}
+  try { db.exec('ALTER TABLE clients ADD COLUMN longitude REAL'); } catch(e) {}
 
   // Invoices table
   db.exec(`CREATE TABLE IF NOT EXISTS invoices (

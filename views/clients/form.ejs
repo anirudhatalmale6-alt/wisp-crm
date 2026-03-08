@@ -108,6 +108,44 @@
     </div>
   </div>
 
+  <!-- GPS Location -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-map-pin text-wisp-600"></i> Ubicación GPS
+      </h3>
+    </div>
+    <div class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label for="latitude" class="block text-sm font-medium text-gray-700 mb-1">Latitud</label>
+          <input type="text" id="latitude" name="latitude" value="<%= c.latitude || '' %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="18.4861" readonly>
+        </div>
+        <div>
+          <label for="longitude" class="block text-sm font-medium text-gray-700 mb-1">Longitud</label>
+          <input type="text" id="longitude" name="longitude" value="<%= c.longitude || '' %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="-69.9312" readonly>
+        </div>
+        <div class="flex items-end gap-2">
+          <button type="button" onclick="getGPSLocation()" id="gps-btn"
+            class="bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <i class="fas fa-crosshairs"></i> Obtener Ubicación
+          </button>
+          <button type="button" onclick="clearLocation()"
+            class="border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm transition-colors">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+      <p id="gps-status" class="text-sm text-gray-500 mb-3"></p>
+      <div id="map" class="w-full rounded-lg border border-gray-200" style="height: 350px;"></div>
+      <p class="text-xs text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i> Haz clic en el mapa para marcar la ubicación, o usa el botón para obtener el GPS de tu dispositivo.</p>
+    </div>
+  </div>
+
   <!-- Service / Plan -->
   <div class="bg-white rounded-xl shadow-sm border">
     <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
@@ -241,7 +279,89 @@
   </div>
 </form>
 
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
+// --- Map initialization ---
+let map, marker;
+const defaultLat = <%= c.latitude || 18.4861 %>;
+const defaultLng = <%= c.longitude || -69.9312 %>;
+const hasLocation = <%= (c.latitude && c.longitude) ? 'true' : 'false' %>;
+
+document.addEventListener('DOMContentLoaded', function() {
+  map = L.map('map').setView([defaultLat, defaultLng], hasLocation ? 16 : 8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  if (hasLocation) {
+    marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
+    marker.on('dragend', function(e) {
+      const pos = e.target.getLatLng();
+      updateCoords(pos.lat, pos.lng);
+    });
+  }
+
+  map.on('click', function(e) {
+    setMarker(e.latlng.lat, e.latlng.lng);
+  });
+});
+
+function setMarker(lat, lng) {
+  if (marker) { marker.setLatLng([lat, lng]); }
+  else {
+    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    marker.on('dragend', function(e) {
+      const pos = e.target.getLatLng();
+      updateCoords(pos.lat, pos.lng);
+    });
+  }
+  updateCoords(lat, lng);
+  map.setView([lat, lng], 16);
+}
+
+function updateCoords(lat, lng) {
+  document.getElementById('latitude').value = lat.toFixed(6);
+  document.getElementById('longitude').value = lng.toFixed(6);
+}
+
+function getGPSLocation() {
+  const btn = document.getElementById('gps-btn');
+  const status = document.getElementById('gps-status');
+  if (!navigator.geolocation) {
+    status.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>Tu navegador no soporta geolocalización</span>';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo...';
+  status.innerHTML = '<span class="text-blue-500"><i class="fas fa-satellite-dish mr-1"></i>Buscando señal GPS...</span>';
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      setMarker(pos.coords.latitude, pos.coords.longitude);
+      status.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Ubicación obtenida (precisión: ' + Math.round(pos.coords.accuracy) + 'm)</span>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-crosshairs"></i> Obtener Ubicación';
+    },
+    function(err) {
+      status.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>Error: ' + err.message + '</span>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-crosshairs"></i> Obtener Ubicación';
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+function clearLocation() {
+  document.getElementById('latitude').value = '';
+  document.getElementById('longitude').value = '';
+  document.getElementById('gps-status').innerHTML = '';
+  if (marker) { map.removeLayer(marker); marker = null; }
+}
+
+// --- Connection fields ---
 function toggleConnectionFields() {
   const type = document.getElementById('connection_type').value;
   const pppoeUser = document.getElementById('pppoe_fields_user');
