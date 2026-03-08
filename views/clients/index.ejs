@@ -1,0 +1,232 @@
+<%- include('../partials/header', { currentPage: 'clients', pageTitle: 'Clientes' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Top bar: title + add button -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h3 class="text-xl font-bold text-gray-800">Lista de Clientes</h3>
+    <p class="text-sm text-gray-500 mt-1"><%= clients.length %> cliente<%= clients.length !== 1 ? 's' : '' %> encontrado<%= clients.length !== 1 ? 's' : '' %></p>
+  </div>
+  <a href="/clients/new" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+    <i class="fas fa-user-plus"></i> Nuevo Cliente
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
+  <form method="GET" action="/clients" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Search -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+      <div class="relative">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-search text-sm"></i></span>
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Nombre, teléfono, email..."
+          class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+    </div>
+
+    <!-- Status filter -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+      <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        <option value="">Todos</option>
+        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Activo</option>
+        <option value="suspended" <%= filters.status === 'suspended' ? 'selected' : '' %>>Suspendido</option>
+        <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Inactivo</option>
+      </select>
+    </div>
+
+    <!-- Plan filter -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Plan</label>
+      <select name="plan_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        <option value="">Todos los planes</option>
+        <% plans.forEach(plan => { %>
+          <option value="<%= plan.id %>" <%= String(filters.plan_id) === String(plan.id) ? 'selected' : '' %>><%= plan.name %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <!-- Filter buttons -->
+    <div class="flex items-end gap-2">
+      <button type="submit" class="flex-1 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <i class="fas fa-filter mr-1"></i> Filtrar
+      </button>
+      <a href="/clients" class="px-4 py-2 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm transition-colors">
+        <i class="fas fa-times"></i>
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Client table -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <% if (clients.length === 0) { %>
+    <div class="p-12 text-center">
+      <i class="fas fa-users text-gray-300 text-5xl mb-4"></i>
+      <p class="text-gray-500 text-lg">No se encontraron clientes</p>
+      <p class="text-gray-400 text-sm mt-1">Ajusta los filtros o agrega un nuevo cliente</p>
+      <a href="/clients/new" class="inline-flex items-center gap-2 mt-4 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+        <i class="fas fa-user-plus"></i> Nuevo Cliente
+      </a>
+    </div>
+  <% } else { %>
+    <!-- Desktop table -->
+    <div class="hidden lg:block overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b">
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Cliente</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Contacto</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Plan</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Conexión</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% clients.forEach(client => { %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <!-- Name -->
+            <td class="px-4 py-3">
+              <a href="/clients/<%= client.id %>" class="font-medium text-gray-800 hover:text-wisp-600 transition-colors">
+                <%= client.first_name %> <%= client.last_name %>
+              </a>
+              <% if (client.neighborhood) { %>
+                <p class="text-xs text-gray-400 mt-0.5"><i class="fas fa-map-marker-alt mr-1"></i><%= client.neighborhood %></p>
+              <% } %>
+            </td>
+
+            <!-- Contact -->
+            <td class="px-4 py-3">
+              <p class="text-gray-700"><i class="fas fa-phone text-gray-400 mr-1 text-xs"></i> <%= client.phone %></p>
+              <% if (client.email) { %>
+                <p class="text-xs text-gray-400 mt-0.5"><i class="fas fa-envelope mr-1"></i> <%= client.email %></p>
+              <% } %>
+            </td>
+
+            <!-- Plan -->
+            <td class="px-4 py-3">
+              <% if (client.plan_name) { %>
+                <span class="inline-block bg-wisp-50 text-wisp-700 text-xs font-medium px-2 py-1 rounded-full"><%= client.plan_name %></span>
+                <p class="text-xs text-gray-400 mt-0.5"><%= currency %><%= Number(client.plan_price || 0).toFixed(2) %>/mes</p>
+              <% } else { %>
+                <span class="text-gray-400 text-xs">Sin plan</span>
+              <% } %>
+            </td>
+
+            <!-- Connection -->
+            <td class="px-4 py-3">
+              <% if (client.connection_type) { %>
+                <span class="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded uppercase"><%= client.connection_type %></span>
+                <% if (client.ip_address) { %>
+                  <p class="text-xs text-gray-400 mt-0.5 font-mono"><%= client.ip_address %></p>
+                <% } %>
+              <% } else { %>
+                <span class="text-gray-400 text-xs">--</span>
+              <% } %>
+            </td>
+
+            <!-- Status -->
+            <td class="px-4 py-3 text-center">
+              <% if (client.status === 'active') { %>
+                <span class="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">Activo</span>
+              <% } else if (client.status === 'suspended') { %>
+                <span class="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">Suspendido</span>
+              <% } else { %>
+                <span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full">Inactivo</span>
+              <% } %>
+            </td>
+
+            <!-- Actions -->
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-center gap-1">
+                <a href="/clients/<%= client.id %>" title="Ver detalles" class="p-2 text-gray-400 hover:text-wisp-600 hover:bg-wisp-50 rounded-lg transition-colors">
+                  <i class="fas fa-eye"></i>
+                </a>
+                <a href="/clients/<%= client.id %>/edit" title="Editar" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <% if (client.phone) { %>
+                  <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" title="WhatsApp" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                    <i class="fab fa-whatsapp"></i>
+                  </a>
+                <% } %>
+                <% if (client.status === 'active') { %>
+                  <form method="POST" action="/mikrotik/cut/<%= client.id %>" class="inline" onsubmit="return confirm('¿Cortar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+                    <button type="submit" title="Cortar servicio" class="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+                      <i class="fas fa-ban"></i>
+                    </button>
+                  </form>
+                <% } else if (client.status === 'suspended') { %>
+                  <form method="POST" action="/mikrotik/reconnect/<%= client.id %>" class="inline" onsubmit="return confirm('¿Reconectar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+                    <button type="submit" title="Reconectar servicio" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                      <i class="fas fa-plug"></i>
+                    </button>
+                  </form>
+                <% } %>
+                <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar a <%= client.first_name %> <%= client.last_name %>? Esta acción no se puede deshacer.')">
+                  <button type="submit" title="Eliminar" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="lg:hidden divide-y">
+      <% clients.forEach(client => { %>
+      <div class="p-4">
+        <div class="flex items-start justify-between mb-2">
+          <a href="/clients/<%= client.id %>" class="font-medium text-gray-800 hover:text-wisp-600">
+            <%= client.first_name %> <%= client.last_name %>
+          </a>
+          <% if (client.status === 'active') { %>
+            <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Activo</span>
+          <% } else if (client.status === 'suspended') { %>
+            <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Suspendido</span>
+          <% } else { %>
+            <span class="bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">Inactivo</span>
+          <% } %>
+        </div>
+        <div class="text-sm text-gray-500 space-y-1">
+          <p><i class="fas fa-phone w-4 text-center mr-1"></i> <%= client.phone %></p>
+          <% if (client.plan_name) { %>
+            <p><i class="fas fa-cube w-4 text-center mr-1"></i> <%= client.plan_name %> &middot; <%= currency %><%= Number(client.plan_price || 0).toFixed(2) %></p>
+          <% } %>
+          <% if (client.ip_address) { %>
+            <p><i class="fas fa-network-wired w-4 text-center mr-1"></i> <span class="font-mono"><%= client.ip_address %></span></p>
+          <% } %>
+        </div>
+        <div class="flex items-center gap-2 mt-3 pt-3 border-t">
+          <a href="/clients/<%= client.id %>" class="text-wisp-600 hover:text-wisp-700 text-sm font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
+          <a href="/clients/<%= client.id %>/edit" class="text-blue-600 hover:text-blue-700 text-sm font-medium"><i class="fas fa-edit mr-1"></i>Editar</a>
+          <% if (client.phone) { %>
+            <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</a>
+          <% } %>
+          <% if (client.status === 'active') { %>
+            <form method="POST" action="/mikrotik/cut/<%= client.id %>" class="inline" onsubmit="return confirm('¿Cortar servicio?')">
+              <button type="submit" class="text-orange-600 hover:text-orange-700 text-sm font-medium"><i class="fas fa-ban mr-1"></i>Cortar</button>
+            </form>
+          <% } else if (client.status === 'suspended') { %>
+            <form method="POST" action="/mikrotik/reconnect/<%= client.id %>" class="inline" onsubmit="return confirm('¿Reconectar servicio?')">
+              <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fas fa-plug mr-1"></i>Reconectar</button>
+            </form>
+          <% } %>
+          <form method="POST" action="/clients/<%= client.id %>/delete" class="inline ml-auto" onsubmit="return confirm('¿Eliminar cliente? Esta acción no se puede deshacer.')">
+            <button type="submit" class="text-red-500 hover:text-red-700 text-sm"><i class="fas fa-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

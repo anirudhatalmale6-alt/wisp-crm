@@ -1,0 +1,149 @@
+<%- include('../partials/header', { currentPage: 'plans', pageTitle: 'Planes' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Top bar: title + add button -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h3 class="text-xl font-bold text-gray-800">Lista de Planes</h3>
+    <p class="text-sm text-gray-500 mt-1"><%= plans.length %> plan<%= plans.length !== 1 ? 'es' : '' %> registrado<%= plans.length !== 1 ? 's' : '' %></p>
+  </div>
+  <a href="/plans/new" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+    <i class="fas fa-plus"></i> Nuevo Plan
+  </a>
+</div>
+
+<!-- Plans table -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <% if (plans.length === 0) { %>
+    <div class="p-12 text-center">
+      <i class="fas fa-cube text-gray-300 text-5xl mb-4"></i>
+      <p class="text-gray-500 text-lg">No hay planes registrados</p>
+      <p class="text-gray-400 text-sm mt-1">Crea un nuevo plan para comenzar</p>
+      <a href="/plans/new" class="inline-flex items-center gap-2 mt-4 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+        <i class="fas fa-plus"></i> Nuevo Plan
+      </a>
+    </div>
+  <% } else { %>
+    <!-- Desktop table -->
+    <div class="hidden lg:block overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b">
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Nombre</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Bajada (Mbps)</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Subida (Mbps)</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-600">Precio</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Clientes</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% plans.forEach(plan => { %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <!-- Name -->
+            <td class="px-4 py-3">
+              <p class="font-medium text-gray-800"><%= plan.name %></p>
+              <% if (plan.description) { %>
+                <p class="text-xs text-gray-400 mt-0.5"><%= plan.description %></p>
+              <% } %>
+            </td>
+
+            <!-- Speed Down -->
+            <td class="px-4 py-3 text-center">
+              <span class="inline-flex items-center gap-1 text-gray-700">
+                <i class="fas fa-arrow-down text-blue-500 text-xs"></i> <%= plan.speed_down %>
+              </span>
+            </td>
+
+            <!-- Speed Up -->
+            <td class="px-4 py-3 text-center">
+              <span class="inline-flex items-center gap-1 text-gray-700">
+                <i class="fas fa-arrow-up text-green-500 text-xs"></i> <%= plan.speed_up %>
+              </span>
+            </td>
+
+            <!-- Price -->
+            <td class="px-4 py-3 text-right font-semibold text-gray-800">
+              <%= currency %><%= Number(plan.price || 0).toFixed(2) %>
+            </td>
+
+            <!-- Client count -->
+            <td class="px-4 py-3 text-center">
+              <span class="inline-block bg-wisp-50 text-wisp-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                <%= plan.client_count || 0 %> cliente<%= (plan.client_count || 0) !== 1 ? 's' : '' %>
+              </span>
+            </td>
+
+            <!-- Status -->
+            <td class="px-4 py-3 text-center">
+              <% if (plan.active === 1 || plan.active === true) { %>
+                <span class="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">Activo</span>
+              <% } else { %>
+                <span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full">Inactivo</span>
+              <% } %>
+            </td>
+
+            <!-- Actions -->
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-center gap-1">
+                <a href="/plans/<%= plan.id %>/edit" title="Editar" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <% if ((plan.client_count || 0) === 0) { %>
+                  <form method="POST" action="/plans/<%= plan.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar el plan &quot;<%= plan.name %>&quot;? Esta acción no se puede deshacer.')">
+                    <button type="submit" title="Eliminar" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                <% } else { %>
+                  <button disabled title="No se puede eliminar: tiene clientes asignados" class="p-2 text-gray-200 cursor-not-allowed rounded-lg">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="lg:hidden divide-y">
+      <% plans.forEach(plan => { %>
+      <div class="p-4">
+        <div class="flex items-start justify-between mb-2">
+          <div>
+            <p class="font-medium text-gray-800"><%= plan.name %></p>
+            <% if (plan.description) { %>
+              <p class="text-xs text-gray-400 mt-0.5"><%= plan.description %></p>
+            <% } %>
+          </div>
+          <% if (plan.active === 1 || plan.active === true) { %>
+            <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Activo</span>
+          <% } else { %>
+            <span class="bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">Inactivo</span>
+          <% } %>
+        </div>
+        <div class="text-sm text-gray-500 space-y-1">
+          <p><i class="fas fa-arrow-down w-4 text-center text-blue-500 mr-1"></i> <%= plan.speed_down %> Mbps / <i class="fas fa-arrow-up text-green-500 mr-1"></i> <%= plan.speed_up %> Mbps</p>
+          <p><i class="fas fa-dollar-sign w-4 text-center mr-1"></i> <%= currency %><%= Number(plan.price || 0).toFixed(2) %>/mes</p>
+          <p><i class="fas fa-users w-4 text-center mr-1"></i> <%= plan.client_count || 0 %> cliente<%= (plan.client_count || 0) !== 1 ? 's' : '' %></p>
+        </div>
+        <div class="flex items-center gap-2 mt-3 pt-3 border-t">
+          <a href="/plans/<%= plan.id %>/edit" class="text-blue-600 hover:text-blue-700 text-sm font-medium"><i class="fas fa-edit mr-1"></i>Editar</a>
+          <% if ((plan.client_count || 0) === 0) { %>
+            <form method="POST" action="/plans/<%= plan.id %>/delete" class="inline ml-auto" onsubmit="return confirm('¿Eliminar este plan?')">
+              <button type="submit" class="text-red-500 hover:text-red-700 text-sm"><i class="fas fa-trash"></i></button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

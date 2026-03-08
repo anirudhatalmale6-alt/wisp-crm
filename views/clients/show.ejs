@@ -1,0 +1,421 @@
+<%- include('../partials/header', { currentPage: 'clients', pageTitle: client.first_name + ' ' + client.last_name }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Breadcrumb + Actions -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-2 text-sm text-gray-500">
+    <a href="/clients" class="hover:text-wisp-600 transition-colors">Clientes</a>
+    <i class="fas fa-chevron-right text-xs"></i>
+    <span class="text-gray-700 font-medium"><%= client.first_name %> <%= client.last_name %></span>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="/clients/<%= client.id %>/edit" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-edit"></i> Editar
+    </a>
+    <% if (client.phone) { %>
+      <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+        <i class="fab fa-whatsapp"></i> WhatsApp
+      </a>
+    <% } %>
+    <% if (client.status === 'active') { %>
+      <form method="POST" action="/mikrotik/cut/<%= client.id %>" class="inline" onsubmit="return confirm('¿Cortar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+        <button type="submit" class="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-ban"></i> Cortar Servicio
+        </button>
+      </form>
+    <% } else if (client.status === 'suspended') { %>
+      <form method="POST" action="/mikrotik/reconnect/<%= client.id %>" class="inline" onsubmit="return confirm('¿Reconectar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+        <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-plug"></i> Reconectar
+        </button>
+      </form>
+    <% } %>
+    <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar a <%= client.first_name %> <%= client.last_name %>? Esta acción no se puede deshacer.')">
+      <button type="submit" class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+        <i class="fas fa-trash"></i> Eliminar
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Client Info Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+  <!-- Personal Info -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-user text-wisp-600"></i> Datos Personales
+      </h3>
+      <% if (client.status === 'active') { %>
+        <span class="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">Activo</span>
+      <% } else if (client.status === 'suspended') { %>
+        <span class="bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">Suspendido</span>
+      <% } else { %>
+        <span class="bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full">Inactivo</span>
+      <% } %>
+    </div>
+    <div class="p-5 space-y-3 text-sm">
+      <div class="flex items-start gap-3">
+        <i class="fas fa-phone w-4 text-center text-gray-400 mt-0.5"></i>
+        <div>
+          <p class="text-gray-700"><%= client.phone %></p>
+          <% if (client.phone2) { %>
+            <p class="text-gray-500 text-xs mt-0.5"><%= client.phone2 %> (alt.)</p>
+          <% } %>
+        </div>
+      </div>
+      <% if (client.email) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-envelope w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700"><%= client.email %></p>
+      </div>
+      <% } %>
+      <% if (client.address || client.city || client.neighborhood) { %>
+      <div class="flex items-start gap-3">
+        <i class="fas fa-map-marker-alt w-4 text-center text-gray-400 mt-0.5"></i>
+        <div>
+          <% if (client.address) { %><p class="text-gray-700"><%= client.address %></p><% } %>
+          <p class="text-gray-500 text-xs">
+            <%= [client.neighborhood, client.city].filter(Boolean).join(', ') %>
+          </p>
+        </div>
+      </div>
+      <% } %>
+      <% if (client.installation_date) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-calendar w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700">Instalación: <%= client.installation_date %></p>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Plan Info -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-cube text-wisp-600"></i> Plan y Facturación
+      </h3>
+    </div>
+    <div class="p-5 space-y-3 text-sm">
+      <% if (client.plan_name) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-wifi w-4 text-center text-gray-400"></i>
+        <div>
+          <p class="text-gray-700 font-medium"><%= client.plan_name %></p>
+          <p class="text-xs text-gray-500"><%= client.speed_down %>/<%= client.speed_up %> Mbps</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-dollar-sign w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700 font-medium"><%= currency %><%= Number(client.plan_price || 0).toFixed(2) %> <span class="text-gray-400 font-normal">/mes</span></p>
+      </div>
+      <% } else { %>
+      <p class="text-gray-400 text-center py-2">Sin plan asignado</p>
+      <% } %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-calendar-day w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700">Día de cobro: <span class="font-medium"><%= client.billing_day || '--' %></span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Technical Info -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-network-wired text-wisp-600"></i> Conexión
+      </h3>
+    </div>
+    <div class="p-5 space-y-3 text-sm">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-plug w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700">Tipo: <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs uppercase"><%= client.connection_type || '--' %></span></p>
+      </div>
+      <% if (client.ip_address) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-globe w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700 font-mono"><%= client.ip_address %></p>
+      </div>
+      <% } %>
+      <% if (client.connection_type === 'pppoe' && client.pppoe_user) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-user-cog w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700 font-mono text-xs"><%= client.pppoe_user %></p>
+      </div>
+      <% } %>
+      <% if (client.mac_address) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-fingerprint w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700 font-mono text-xs uppercase"><%= client.mac_address %></p>
+      </div>
+      <% } %>
+      <% if (client.router_name) { %>
+      <div class="flex items-center gap-3">
+        <i class="fas fa-router w-4 text-center text-gray-400"></i>
+        <p class="text-gray-700"><%= client.router_name %></p>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Notes -->
+<% if (client.notes) { %>
+<div class="bg-white rounded-xl shadow-sm border mb-6">
+  <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+    <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+      <i class="fas fa-sticky-note text-wisp-600"></i> Notas
+    </h3>
+  </div>
+  <div class="p-5 text-sm text-gray-700 whitespace-pre-wrap"><%= client.notes %></div>
+</div>
+<% } %>
+
+<!-- Tabs -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <!-- Tab headers -->
+  <div class="border-b flex overflow-x-auto">
+    <button onclick="switchTab('invoices')" id="tab-invoices" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-wisp-600 text-wisp-700 whitespace-nowrap">
+      <i class="fas fa-file-invoice-dollar mr-1"></i> Facturas
+      <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded-full"><%= invoices.length %></span>
+    </button>
+    <button onclick="switchTab('payments')" id="tab-payments" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+      <i class="fas fa-money-bill-wave mr-1"></i> Pagos
+      <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded-full"><%= payments.length %></span>
+    </button>
+    <button onclick="switchTab('messages')" id="tab-messages" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+      <i class="fab fa-whatsapp mr-1"></i> Mensajes
+      <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded-full"><%= messages.length %></span>
+    </button>
+    <button onclick="switchTab('cuts')" id="tab-cuts" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+      <i class="fas fa-ban mr-1"></i> Cortes
+      <span class="ml-1 bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded-full"><%= cuts.length %></span>
+    </button>
+  </div>
+
+  <!-- Tab: Invoices -->
+  <div id="panel-invoices" class="tab-panel">
+    <% if (invoices.length === 0) { %>
+      <div class="p-8 text-center">
+        <i class="fas fa-file-invoice text-gray-300 text-4xl mb-3"></i>
+        <p class="text-gray-400">No hay facturas registradas</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b">
+              <th class="text-left px-4 py-3 font-semibold text-gray-600"># Factura</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Período</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Monto</th>
+              <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Vencimiento</th>
+              <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <% invoices.forEach(inv => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-mono text-gray-700">#<%= inv.id %></td>
+              <td class="px-4 py-3 text-gray-600"><%= inv.period || '--' %></td>
+              <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= currency %><%= Number(inv.amount || 0).toFixed(2) %></td>
+              <td class="px-4 py-3 text-center">
+                <% if (inv.status === 'paid') { %>
+                  <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pagada</span>
+                <% } else if (inv.status === 'overdue') { %>
+                  <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Vencida</span>
+                <% } else { %>
+                  <span class="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pendiente</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 text-gray-600"><%= inv.due_date || '--' %></td>
+              <td class="px-4 py-3 text-center">
+                <a href="/invoices/<%= inv.id %>" class="text-wisp-600 hover:text-wisp-700 text-xs font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Tab: Payments -->
+  <div id="panel-payments" class="tab-panel hidden">
+    <% if (payments.length === 0) { %>
+      <div class="p-8 text-center">
+        <i class="fas fa-money-bill-wave text-gray-300 text-4xl mb-3"></i>
+        <p class="text-gray-400">No hay pagos registrados</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b">
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Monto</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Método</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Factura</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Nota</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <% payments.forEach(pay => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-gray-700"><%= pay.created_at || pay.date || '--' %></td>
+              <td class="px-4 py-3 text-right font-semibold text-green-600"><%= currency %><%= Number(pay.amount || 0).toFixed(2) %></td>
+              <td class="px-4 py-3 text-gray-600">
+                <% if (pay.method === 'cash') { %>
+                  <span class="text-xs"><i class="fas fa-money-bill mr-1"></i>Efectivo</span>
+                <% } else if (pay.method === 'transfer') { %>
+                  <span class="text-xs"><i class="fas fa-exchange-alt mr-1"></i>Transferencia</span>
+                <% } else { %>
+                  <span class="text-xs"><%= pay.method || '--' %></span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 text-gray-600">
+                <% if (pay.invoice_id) { %>
+                  <a href="/invoices/<%= pay.invoice_id %>" class="text-wisp-600 hover:text-wisp-700 font-mono">#<%= pay.invoice_id %></a>
+                <% } else { %>
+                  <span class="text-gray-400">--</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 text-gray-500 text-xs"><%= pay.notes || '' %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Tab: Messages -->
+  <div id="panel-messages" class="tab-panel hidden">
+    <% if (messages.length === 0) { %>
+      <div class="p-8 text-center">
+        <i class="fab fa-whatsapp text-gray-300 text-4xl mb-3"></i>
+        <p class="text-gray-400">No hay mensajes enviados</p>
+      </div>
+    <% } else { %>
+      <div class="divide-y">
+        <% messages.forEach(msg => { %>
+        <div class="p-4 hover:bg-gray-50">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <% if (msg.type === 'reminder') { %>
+                  <span class="bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">Recordatorio</span>
+                <% } else if (msg.type === 'cut_notice') { %>
+                  <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">Aviso de Corte</span>
+                <% } else { %>
+                  <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full"><%= msg.type || 'Mensaje' %></span>
+                <% } %>
+                <span class="text-xs text-gray-400"><%= msg.created_at || msg.sent_at || '' %></span>
+              </div>
+              <p class="text-sm text-gray-700"><%= msg.message || msg.content || '' %></p>
+            </div>
+            <div class="ml-3">
+              <% if (msg.status === 'sent' || msg.status === 'delivered') { %>
+                <span class="text-green-500 text-xs"><i class="fas fa-check-double"></i> Enviado</span>
+              <% } else if (msg.status === 'failed') { %>
+                <span class="text-red-500 text-xs"><i class="fas fa-times"></i> Fallido</span>
+              <% } else { %>
+                <span class="text-gray-400 text-xs"><i class="fas fa-clock"></i> Pendiente</span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Tab: Service Cuts -->
+  <div id="panel-cuts" class="tab-panel hidden">
+    <% if (cuts.length === 0) { %>
+      <div class="p-8 text-center">
+        <i class="fas fa-ban text-gray-300 text-4xl mb-3"></i>
+        <p class="text-gray-400">No hay cortes de servicio registrados</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b">
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Fecha de Corte</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Motivo</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Reconexión</th>
+              <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <% cuts.forEach(cut => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-gray-700"><%= cut.cut_date || cut.created_at || '--' %></td>
+              <td class="px-4 py-3 text-gray-600"><%= cut.reason || 'Falta de pago' %></td>
+              <td class="px-4 py-3 text-gray-600">
+                <% if (cut.reconnected_at) { %>
+                  <span class="text-green-600"><i class="fas fa-plug mr-1"></i><%= cut.reconnected_at %></span>
+                <% } else { %>
+                  <span class="text-gray-400">--</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <% if (cut.reconnected_at) { %>
+                  <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Reconectado</span>
+                <% } else { %>
+                  <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Cortado</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Send WhatsApp Message -->
+<div class="bg-white rounded-xl shadow-sm border mt-6">
+  <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+    <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+      <i class="fab fa-whatsapp text-green-600"></i> Enviar Mensaje WhatsApp
+    </h3>
+  </div>
+  <div class="p-5">
+    <form method="POST" action="/whatsapp/send" class="flex flex-col sm:flex-row gap-3">
+      <input type="hidden" name="client_id" value="<%= client.id %>">
+      <input type="hidden" name="phone" value="<%= client.phone %>">
+      <input type="text" name="message" placeholder="Escribir mensaje..."
+        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+        required>
+      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap">
+        <i class="fab fa-whatsapp mr-1"></i> Enviar
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  // Hide all panels
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  // Reset all tab buttons
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('border-wisp-600', 'text-wisp-700');
+    b.classList.add('border-transparent', 'text-gray-500');
+  });
+  // Show selected panel
+  document.getElementById('panel-' + tab).classList.remove('hidden');
+  // Activate selected tab button
+  const btn = document.getElementById('tab-' + tab);
+  btn.classList.remove('border-transparent', 'text-gray-500');
+  btn.classList.add('border-wisp-600', 'text-wisp-700');
+}
+</script>
+
+<%- include('../partials/footer') %>

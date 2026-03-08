@@ -1,0 +1,274 @@
+<%- include('../partials/header', { currentPage: 'clients', pageTitle: client ? 'Editar Cliente' : 'Nuevo Cliente' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+<% const isEdit = !!client; %>
+<% const c = client || {}; %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/clients" class="hover:text-wisp-600 transition-colors">Clientes</a>
+  <i class="fas fa-chevron-right text-xs"></i>
+  <span class="text-gray-700 font-medium"><%= isEdit ? 'Editar' : 'Nuevo' %> Cliente</span>
+</div>
+
+<form method="POST" action="<%= isEdit ? '/clients/' + c.id : '/clients' %>" class="space-y-6">
+
+  <!-- Personal Information -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-user text-wisp-600"></i> Información Personal
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- First Name -->
+      <div>
+        <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+        <input type="text" id="first_name" name="first_name" value="<%= c.first_name || '' %>" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Nombre del cliente">
+      </div>
+
+      <!-- Last Name -->
+      <div>
+        <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1">Apellido <span class="text-red-500">*</span></label>
+        <input type="text" id="last_name" name="last_name" value="<%= c.last_name || '' %>" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Apellido del cliente">
+      </div>
+
+      <!-- Phone -->
+      <div>
+        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Teléfono <span class="text-red-500">*</span></label>
+        <input type="tel" id="phone" name="phone" value="<%= c.phone || '' %>" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="+52 123 456 7890">
+      </div>
+
+      <!-- Phone 2 -->
+      <div>
+        <label for="phone2" class="block text-sm font-medium text-gray-700 mb-1">Teléfono 2</label>
+        <input type="tel" id="phone2" name="phone2" value="<%= c.phone2 || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Teléfono alternativo">
+      </div>
+
+      <!-- Email -->
+      <div>
+        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+        <input type="email" id="email" name="email" value="<%= c.email || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="correo@ejemplo.com">
+      </div>
+
+      <!-- Status -->
+      <div>
+        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+        <select id="status" name="status"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="active" <%= (c.status || 'active') === 'active' ? 'selected' : '' %>>Activo</option>
+          <option value="suspended" <%= c.status === 'suspended' ? 'selected' : '' %>>Suspendido</option>
+          <option value="inactive" <%= c.status === 'inactive' ? 'selected' : '' %>>Inactivo</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Address -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-map-marker-alt text-wisp-600"></i> Dirección
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Address -->
+      <div class="md:col-span-3">
+        <label for="address" class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+        <input type="text" id="address" name="address" value="<%= c.address || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Calle, número, colonia...">
+      </div>
+
+      <!-- City -->
+      <div>
+        <label for="city" class="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+        <input type="text" id="city" name="city" value="<%= c.city || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Ciudad">
+      </div>
+
+      <!-- Neighborhood -->
+      <div class="md:col-span-2">
+        <label for="neighborhood" class="block text-sm font-medium text-gray-700 mb-1">Colonia / Barrio</label>
+        <input type="text" id="neighborhood" name="neighborhood" value="<%= c.neighborhood || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Colonia o barrio">
+      </div>
+    </div>
+  </div>
+
+  <!-- Service / Plan -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-cube text-wisp-600"></i> Plan y Servicio
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Plan -->
+      <div>
+        <label for="plan_id" class="block text-sm font-medium text-gray-700 mb-1">Plan <span class="text-red-500">*</span></label>
+        <select id="plan_id" name="plan_id" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="">Seleccionar plan...</option>
+          <% plans.forEach(plan => { %>
+            <option value="<%= plan.id %>" <%= String(c.plan_id) === String(plan.id) ? 'selected' : '' %>>
+              <%= plan.name %> - <%= currency %><%= Number(plan.price).toFixed(2) %> (<%= plan.speed_down %>/<%= plan.speed_up %> Mbps)
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <!-- Billing Day -->
+      <div>
+        <label for="billing_day" class="block text-sm font-medium text-gray-700 mb-1">Día de Facturación <span class="text-red-500">*</span></label>
+        <select id="billing_day" name="billing_day" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <% for (let d = 1; d <= 28; d++) { %>
+            <option value="<%= d %>" <%= Number(c.billing_day) === d ? 'selected' : '' %>><%= d %></option>
+          <% } %>
+        </select>
+      </div>
+
+      <!-- Installation Date -->
+      <div>
+        <label for="installation_date" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Instalación</label>
+        <input type="date" id="installation_date" name="installation_date" value="<%= c.installation_date || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection / Technical -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-network-wired text-wisp-600"></i> Datos Técnicos de Conexión
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Connection Type -->
+      <div>
+        <label for="connection_type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Conexión</label>
+        <select id="connection_type" name="connection_type"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          onchange="toggleConnectionFields()">
+          <option value="pppoe" <%= (c.connection_type || 'pppoe') === 'pppoe' ? 'selected' : '' %>>PPPoE</option>
+          <option value="static" <%= c.connection_type === 'static' ? 'selected' : '' %>>IP Estática</option>
+        </select>
+      </div>
+
+      <!-- IP Address -->
+      <div>
+        <label for="ip_address" class="block text-sm font-medium text-gray-700 mb-1">Dirección IP</label>
+        <input type="text" id="ip_address" name="ip_address" value="<%= c.ip_address || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+          placeholder="192.168.1.100">
+      </div>
+
+      <!-- PPPoE User -->
+      <div id="pppoe_fields_user">
+        <label for="pppoe_user" class="block text-sm font-medium text-gray-700 mb-1">Usuario PPPoE</label>
+        <input type="text" id="pppoe_user" name="pppoe_user" value="<%= c.pppoe_user || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+          placeholder="usuario_pppoe">
+      </div>
+
+      <!-- PPPoE Password -->
+      <div id="pppoe_fields_pass">
+        <label for="pppoe_password" class="block text-sm font-medium text-gray-700 mb-1">Contraseña PPPoE</label>
+        <div class="relative">
+          <input type="password" id="pppoe_password" name="pppoe_password" value="<%= c.pppoe_password || '' %>"
+            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="contraseña">
+          <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+            <i id="pass-icon" class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- MAC Address -->
+      <div>
+        <label for="mac_address" class="block text-sm font-medium text-gray-700 mb-1">Dirección MAC</label>
+        <input type="text" id="mac_address" name="mac_address" value="<%= c.mac_address || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono uppercase"
+          placeholder="AA:BB:CC:DD:EE:FF">
+      </div>
+
+      <!-- Router Name -->
+      <div>
+        <label for="router_name" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Router</label>
+        <input type="text" id="router_name" name="router_name" value="<%= c.router_name || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Router asignado">
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-sticky-note text-wisp-600"></i> Notas
+      </h3>
+    </div>
+    <div class="p-5">
+      <textarea id="notes" name="notes" rows="3"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none resize-y"
+        placeholder="Notas adicionales sobre el cliente..."><%= c.notes || '' %></textarea>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center justify-between">
+    <a href="<%= isEdit ? '/clients/' + c.id : '/clients' %>" class="px-4 py-2.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-arrow-left mr-1"></i> Cancelar
+    </a>
+    <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-save mr-1"></i> <%= isEdit ? 'Guardar Cambios' : 'Crear Cliente' %>
+    </button>
+  </div>
+</form>
+
+<script>
+function toggleConnectionFields() {
+  const type = document.getElementById('connection_type').value;
+  const pppoeUser = document.getElementById('pppoe_fields_user');
+  const pppoePass = document.getElementById('pppoe_fields_pass');
+  if (type === 'pppoe') {
+    pppoeUser.style.display = '';
+    pppoePass.style.display = '';
+  } else {
+    pppoeUser.style.display = 'none';
+    pppoePass.style.display = 'none';
+  }
+}
+
+function togglePassword() {
+  const input = document.getElementById('pppoe_password');
+  const icon = document.getElementById('pass-icon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    input.type = 'password';
+    icon.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+
+// Initialize visibility on load
+toggleConnectionFields();
+</script>
+
+<%- include('../partials/footer') %>

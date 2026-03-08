@@ -1,0 +1,166 @@
+<%- include('../partials/header', { currentPage: 'payments', pageTitle: 'Nuevo Pago' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/payments" class="hover:text-wisp-600 transition-colors">Pagos</a>
+  <i class="fas fa-chevron-right text-xs"></i>
+  <span class="text-gray-700 font-medium">Nuevo Pago</span>
+</div>
+
+<form method="POST" action="/payments" class="space-y-6">
+
+  <!-- Payment Information -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-money-bill-wave text-wisp-600"></i> Información del Pago
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Client -->
+      <div>
+        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1">Cliente <span class="text-red-500">*</span></label>
+        <select id="client_id" name="client_id" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          onchange="loadClientInvoices()">
+          <option value="">Seleccionar cliente...</option>
+          <% clients.forEach(c => { %>
+            <option value="<%= c.id %>" <%= (typeof clientId !== 'undefined' && String(clientId) === String(c.id)) ? 'selected' : '' %>>
+              <%= c.first_name %> <%= c.last_name %> - <%= c.phone %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <!-- Invoice -->
+      <div>
+        <label for="invoice_id" class="block text-sm font-medium text-gray-700 mb-1">Factura</label>
+        <select id="invoice_id" name="invoice_id"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          onchange="updateAmount()">
+          <option value="">Sin factura asociada</option>
+          <% if (typeof pendingInvoices !== 'undefined') { %>
+            <% pendingInvoices.forEach(inv => { %>
+              <option value="<%= inv.id %>" data-amount="<%= inv.amount %>">
+                #<%= inv.invoice_number || inv.id %> - <%= inv.period || '' %> - <%= currency %><%= Number(inv.amount || 0).toFixed(2) %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+        <p class="text-xs text-gray-400 mt-1" id="no-invoices-msg" style="display: none;">Este cliente no tiene facturas pendientes</p>
+      </div>
+
+      <!-- Amount -->
+      <div>
+        <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Monto <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-dollar-sign text-sm"></i></span>
+          <input type="number" id="amount" name="amount" required min="0.01" step="0.01"
+            class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="0.00">
+        </div>
+      </div>
+
+      <!-- Payment Method -->
+      <div>
+        <label for="method" class="block text-sm font-medium text-gray-700 mb-1">Método de Pago <span class="text-red-500">*</span></label>
+        <select id="method" name="method" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="cash"><i class="fas fa-money-bill"></i> Efectivo</option>
+          <option value="transfer">Transferencia</option>
+          <option value="card">Tarjeta</option>
+          <option value="other">Otro</option>
+        </select>
+      </div>
+
+      <!-- Reference -->
+      <div>
+        <label for="reference" class="block text-sm font-medium text-gray-700 mb-1">Referencia / Comprobante</label>
+        <input type="text" id="reference" name="reference"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Número de transferencia, recibo, etc.">
+      </div>
+
+      <!-- Notes -->
+      <div>
+        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+        <input type="text" id="notes" name="notes"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Notas adicionales (opcional)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center justify-between">
+    <a href="/payments" class="px-4 py-2.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-arrow-left mr-1"></i> Cancelar
+    </a>
+    <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-save mr-1"></i> Registrar Pago
+    </button>
+  </div>
+</form>
+
+<script>
+// Store pending invoices data for client-side filtering
+const allInvoices = [
+  <% if (typeof pendingInvoices !== 'undefined') { %>
+    <% pendingInvoices.forEach(inv => { %>
+    { id: <%= inv.id %>, client_id: <%= inv.client_id %>, number: '<%= inv.invoice_number || inv.id %>', period: '<%= inv.period || '' %>', amount: <%= inv.amount || 0 %> },
+    <% }) %>
+  <% } %>
+];
+
+function loadClientInvoices() {
+  const clientId = document.getElementById('client_id').value;
+  const invoiceSelect = document.getElementById('invoice_id');
+  const noInvoicesMsg = document.getElementById('no-invoices-msg');
+  const currency = '<%= currency %>';
+
+  // Clear current options
+  invoiceSelect.innerHTML = '<option value="">Sin factura asociada</option>';
+
+  if (!clientId) {
+    noInvoicesMsg.style.display = 'none';
+    return;
+  }
+
+  // Filter invoices for this client
+  const clientInvoices = allInvoices.filter(inv => String(inv.client_id) === String(clientId));
+
+  if (clientInvoices.length === 0) {
+    noInvoicesMsg.style.display = '';
+  } else {
+    noInvoicesMsg.style.display = 'none';
+    clientInvoices.forEach(inv => {
+      const opt = document.createElement('option');
+      opt.value = inv.id;
+      opt.dataset.amount = inv.amount;
+      opt.textContent = '#' + inv.number + ' - ' + inv.period + ' - ' + currency + Number(inv.amount).toFixed(2);
+      invoiceSelect.appendChild(opt);
+    });
+  }
+}
+
+function updateAmount() {
+  const invoiceSelect = document.getElementById('invoice_id');
+  const amountInput = document.getElementById('amount');
+  const selectedOption = invoiceSelect.options[invoiceSelect.selectedIndex];
+
+  if (selectedOption && selectedOption.dataset.amount) {
+    amountInput.value = Number(selectedOption.dataset.amount).toFixed(2);
+  }
+}
+
+// Initialize on page load if client is pre-selected
+<% if (typeof clientId !== 'undefined' && clientId) { %>
+  document.addEventListener('DOMContentLoaded', function() {
+    loadClientInvoices();
+  });
+<% } %>
+</script>
+
+<%- include('../partials/footer') %>

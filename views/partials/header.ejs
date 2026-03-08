@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WISP CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+            wisp: { 50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<% if (user) { %>
+<!-- Mobile menu button -->
+<button onclick="document.getElementById('sidebar').classList.toggle('open')" class="md:hidden fixed top-4 left-4 z-50 bg-wisp-600 text-white p-2 rounded-lg shadow-lg">
+  <i class="fas fa-bars"></i>
+</button>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-full w-64 bg-wisp-800 text-white z-40 flex flex-col">
+  <div class="p-5 border-b border-wisp-700">
+    <h1 class="text-xl font-bold flex items-center gap-2">
+      <i class="fas fa-wifi"></i> WISP CRM
+    </h1>
+    <p class="text-wisp-300 text-sm mt-1">Panel de Control</p>
+  </div>
+
+  <nav class="flex-1 py-4 overflow-y-auto">
+    <a href="/dashboard" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'dashboard' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-chart-line w-5 text-center"></i> Dashboard
+    </a>
+    <a href="/clients" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'clients' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-users w-5 text-center"></i> Clientes
+    </a>
+    <a href="/plans" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'plans' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-cube w-5 text-center"></i> Planes
+    </a>
+    <a href="/invoices" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'invoices' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-file-invoice-dollar w-5 text-center"></i> Facturas
+    </a>
+    <a href="/payments" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'payments' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-money-bill-wave w-5 text-center"></i> Pagos
+    </a>
+    <a href="/whatsapp" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'whatsapp' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fab fa-whatsapp w-5 text-center"></i> WhatsApp
+    </a>
+    <a href="/mikrotik" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'mikrotik' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-network-wired w-5 text-center"></i> MikroTik
+    </a>
+
+    <div class="border-t border-wisp-700 mt-4 pt-4">
+      <a href="/settings" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'settings' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+        <i class="fas fa-cog w-5 text-center"></i> Configuración
+      </a>
+    </div>
+  </nav>
+
+  <div class="p-4 border-t border-wisp-700">
+    <div class="flex items-center justify-between">
+      <span class="text-sm text-wisp-300"><i class="fas fa-user mr-1"></i> <%= user.name %></span>
+      <a href="/logout" class="text-wisp-400 hover:text-white text-sm"><i class="fas fa-sign-out-alt"></i></a>
+    </div>
+  </div>
+</aside>
+
+<!-- Main content -->
+<main class="md:ml-64 min-h-screen">
+  <!-- Top bar -->
+  <div class="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-gray-700"><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Dashboard' %></h2>
+    <div class="text-sm text-gray-500"><%= new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+  </div>
+
+  <!-- Alerts -->
+  <% if (success) { %>
+  <div class="mx-6 mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+    <i class="fas fa-check-circle"></i> <%= success %>
+  </div>
+  <% } %>
+  <% if (error) { %>
+  <div class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+    <i class="fas fa-exclamation-circle"></i> <%= error %>
+  </div>
+  <% } %>
+
+  <div class="p-6">
+<% } %>

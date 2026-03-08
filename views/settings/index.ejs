@@ -1,0 +1,345 @@
+<%- include('../partials/header', { currentPage: 'settings', pageTitle: 'Configuración' }) %>
+
+<%
+  // Helper to get setting value safely
+  function sv(key) {
+    return (settings && settings[key] && settings[key].value !== undefined) ? settings[key].value : '';
+  }
+  function sd(key) {
+    return (settings && settings[key] && settings[key].description) ? settings[key].description : '';
+  }
+%>
+
+<div class="space-y-6">
+
+  <!-- General Settings -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-building text-wisp-600"></i> General
+      </h3>
+    </div>
+    <form method="POST" action="/settings/general" class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Company Name -->
+        <div>
+          <label for="company_name" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Empresa</label>
+          <input type="text" id="company_name" name="company_name" value="<%= sv('company_name') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="Mi WISP Internet">
+          <% if (sd('company_name')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('company_name') %></p><% } %>
+        </div>
+
+        <!-- Company Phone -->
+        <div>
+          <label for="company_phone" class="block text-sm font-medium text-gray-700 mb-1">Teléfono de la Empresa</label>
+          <input type="tel" id="company_phone" name="company_phone" value="<%= sv('company_phone') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="+52 123 456 7890">
+          <% if (sd('company_phone')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('company_phone') %></p><% } %>
+        </div>
+
+        <!-- Currency -->
+        <div>
+          <label for="currency" class="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
+          <input type="text" id="currency" name="currency" value="<%= sv('currency') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="$" maxlength="5">
+          <% if (sd('currency')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('currency') %></p><% } %>
+        </div>
+
+        <!-- Tax Rate -->
+        <div>
+          <label for="tax_rate" class="block text-sm font-medium text-gray-700 mb-1">Tasa de Impuesto (%)</label>
+          <div class="relative">
+            <input type="number" id="tax_rate" name="tax_rate" value="<%= sv('tax_rate') %>" min="0" max="100" step="0.01"
+              class="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+              placeholder="16">
+            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">%</span>
+          </div>
+          <% if (sd('tax_rate')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('tax_rate') %></p><% } %>
+        </div>
+
+        <!-- Grace Days -->
+        <div>
+          <label for="grace_days" class="block text-sm font-medium text-gray-700 mb-1">Días de Gracia</label>
+          <input type="number" id="grace_days" name="grace_days" value="<%= sv('grace_days') %>" min="0" max="30"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="5">
+          <% if (sd('grace_days')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('grace_days') %></p><% } %>
+        </div>
+
+        <!-- Payment Reminder Days -->
+        <div>
+          <label for="payment_reminder_days" class="block text-sm font-medium text-gray-700 mb-1">Días para Recordatorio de Pago</label>
+          <input type="number" id="payment_reminder_days" name="payment_reminder_days" value="<%= sv('payment_reminder_days') %>" min="0" max="30"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="3">
+          <% if (sd('payment_reminder_days')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('payment_reminder_days') %></p><% } %>
+        </div>
+
+        <!-- Auto Cut -->
+        <div class="md:col-span-2">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="auto_cut_enabled" value="1" <%= sv('auto_cut_enabled') === '1' ? 'checked' : '' %>
+              class="w-4 h-4 text-wisp-600 border-gray-300 rounded focus:ring-wisp-500">
+            <div>
+              <span class="text-sm font-medium text-gray-700">Corte automático habilitado</span>
+              <% if (sd('auto_cut_enabled')) { %>
+                <p class="text-xs text-gray-400"><%= sd('auto_cut_enabled') %></p>
+              <% } else { %>
+                <p class="text-xs text-gray-400">Cortar servicio automáticamente cuando se pasa la fecha de vencimiento + días de gracia</p>
+              <% } %>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-4 border-t">
+        <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-save mr-1"></i> Guardar General
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- WhatsApp Settings -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fab fa-whatsapp text-green-600"></i> WhatsApp Business API
+      </h3>
+    </div>
+    <form method="POST" action="/settings/whatsapp" class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- WhatsApp Enabled -->
+        <div class="md:col-span-2">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="whatsapp_enabled" value="1" <%= sv('whatsapp_enabled') === '1' ? 'checked' : '' %>
+              class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+            <div>
+              <span class="text-sm font-medium text-gray-700">Habilitar integración WhatsApp</span>
+              <p class="text-xs text-gray-400">Activar el envío de mensajes por WhatsApp Business API</p>
+            </div>
+          </label>
+        </div>
+
+        <!-- WhatsApp Phone ID -->
+        <div>
+          <label for="whatsapp_phone_id" class="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
+          <input type="text" id="whatsapp_phone_id" name="whatsapp_phone_id" value="<%= sv('whatsapp_phone_id') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none font-mono"
+            placeholder="123456789012345">
+          <% if (sd('whatsapp_phone_id')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('whatsapp_phone_id') %></p><% } %>
+        </div>
+
+        <!-- WhatsApp Token -->
+        <div>
+          <label for="whatsapp_token" class="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+          <div class="relative">
+            <input type="password" id="whatsapp_token" name="whatsapp_token" value="<%= sv('whatsapp_token') %>"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none font-mono"
+              placeholder="EAAxxxxxxx...">
+            <button type="button" onclick="toggleField('whatsapp_token')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <% if (sd('whatsapp_token')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('whatsapp_token') %></p><% } %>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-4 border-t">
+        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-save mr-1"></i> Guardar WhatsApp
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MikroTik Settings -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-network-wired text-wisp-600"></i> MikroTik RouterOS
+      </h3>
+    </div>
+    <form method="POST" action="/settings/mikrotik" class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- MikroTik Host -->
+        <div>
+          <label for="mikrotik_host" class="block text-sm font-medium text-gray-700 mb-1">Host / IP del Router</label>
+          <input type="text" id="mikrotik_host" name="mikrotik_host" value="<%= sv('mikrotik_host') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="192.168.88.1">
+          <% if (sd('mikrotik_host')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('mikrotik_host') %></p><% } %>
+        </div>
+
+        <!-- MikroTik Port -->
+        <div>
+          <label for="mikrotik_port" class="block text-sm font-medium text-gray-700 mb-1">Puerto API</label>
+          <input type="number" id="mikrotik_port" name="mikrotik_port" value="<%= sv('mikrotik_port') %>" min="1" max="65535"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="8728">
+          <% if (sd('mikrotik_port')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('mikrotik_port') %></p><% } %>
+        </div>
+
+        <!-- MikroTik User -->
+        <div>
+          <label for="mikrotik_user" class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+          <input type="text" id="mikrotik_user" name="mikrotik_user" value="<%= sv('mikrotik_user') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+            placeholder="admin">
+          <% if (sd('mikrotik_user')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('mikrotik_user') %></p><% } %>
+        </div>
+
+        <!-- MikroTik Password -->
+        <div>
+          <label for="mikrotik_pass" class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <div class="relative">
+            <input type="password" id="mikrotik_pass" name="mikrotik_pass" value="<%= sv('mikrotik_pass') %>"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+              placeholder="••••••••">
+            <button type="button" onclick="toggleField('mikrotik_pass')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <% if (sd('mikrotik_pass')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('mikrotik_pass') %></p><% } %>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-4 border-t">
+        <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-save mr-1"></i> Guardar MikroTik
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Templates -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-file-alt text-wisp-600"></i> Plantillas de Mensajes
+      </h3>
+    </div>
+    <div class="p-5">
+      <% if (typeof templates !== 'undefined' && templates.length > 0) { %>
+        <div class="space-y-4">
+          <% templates.forEach(tmpl => { %>
+          <form method="POST" action="/settings/templates/<%= tmpl.id %>" class="border rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h4 class="font-semibold text-gray-700 text-sm"><%= tmpl.name %></h4>
+                <% if (tmpl.category) { %>
+                  <span class="text-xs text-gray-400"><%= tmpl.category %></span>
+                <% } %>
+              </div>
+            </div>
+            <textarea name="content" rows="3"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none resize-y font-mono"
+            ><%= tmpl.content || '' %></textarea>
+            <div class="flex items-center justify-between mt-2">
+              <p class="text-xs text-gray-400">
+                Variables: <code class="bg-gray-100 px-1 rounded">{nombre}</code>
+                <code class="bg-gray-100 px-1 rounded">{monto}</code>
+                <code class="bg-gray-100 px-1 rounded">{fecha_vencimiento}</code>
+                <code class="bg-gray-100 px-1 rounded">{empresa}</code>
+              </p>
+              <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                <i class="fas fa-save mr-1"></i> Guardar
+              </button>
+            </div>
+          </form>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-gray-400 text-sm text-center py-4">No hay plantillas configuradas</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Change Password -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-lock text-wisp-600"></i> Cambiar Contraseña
+      </h3>
+    </div>
+    <form method="POST" action="/settings/password" class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Current Password -->
+        <div>
+          <label for="current_password" class="block text-sm font-medium text-gray-700 mb-1">Contraseña Actual <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input type="password" id="current_password" name="current_password" required
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+              placeholder="••••••••">
+            <button type="button" onclick="toggleField('current_password')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- New Password -->
+        <div>
+          <label for="new_password" class="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input type="password" id="new_password" name="new_password" required minlength="6"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+              placeholder="••••••••">
+            <button type="button" onclick="toggleField('new_password')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div>
+          <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input type="password" id="confirm_password" name="confirm_password" required minlength="6"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+              placeholder="••••••••">
+            <button type="button" onclick="toggleField('confirm_password')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-4 border-t">
+        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+          onclick="return validatePasswords()">
+          <i class="fas fa-key mr-1"></i> Cambiar Contraseña
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+function toggleField(fieldId) {
+  const input = document.getElementById(fieldId);
+  const icon = input.nextElementSibling ? input.nextElementSibling.querySelector('i') || input.parentElement.querySelector('button i') : null;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) icon.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    input.type = 'password';
+    if (icon) icon.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+
+function validatePasswords() {
+  const newPass = document.getElementById('new_password').value;
+  const confirmPass = document.getElementById('confirm_password').value;
+  if (newPass !== confirmPass) {
+    alert('Las contraseñas no coinciden');
+    return false;
+  }
+  return confirm('¿Está seguro de cambiar la contraseña?');
+}
+</script>
+
+<%- include('../partials/footer') %>

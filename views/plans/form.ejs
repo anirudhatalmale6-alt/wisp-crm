@@ -1,0 +1,95 @@
+<%- include('../partials/header', { currentPage: 'plans', pageTitle: plan ? 'Editar Plan' : 'Nuevo Plan' }) %>
+
+<% const isEdit = !!plan; %>
+<% const p = plan || {}; %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/plans" class="hover:text-wisp-600 transition-colors">Planes</a>
+  <i class="fas fa-chevron-right text-xs"></i>
+  <span class="text-gray-700 font-medium"><%= isEdit ? 'Editar' : 'Nuevo' %> Plan</span>
+</div>
+
+<form method="POST" action="<%= isEdit ? '/plans/' + p.id : '/plans' %>" class="space-y-6">
+
+  <!-- Plan Information -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-cube text-wisp-600"></i> Información del Plan
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Name -->
+      <div class="md:col-span-2">
+        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Plan <span class="text-red-500">*</span></label>
+        <input type="text" id="name" name="name" value="<%= p.name || '' %>" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Ej: Plan Básico 10 Mbps">
+      </div>
+
+      <!-- Speed Down -->
+      <div>
+        <label for="speed_down" class="block text-sm font-medium text-gray-700 mb-1">Velocidad de Bajada (Mbps) <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-arrow-down text-sm"></i></span>
+          <input type="number" id="speed_down" name="speed_down" value="<%= p.speed_down || '' %>" required min="1" step="1"
+            class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="10">
+        </div>
+      </div>
+
+      <!-- Speed Up -->
+      <div>
+        <label for="speed_up" class="block text-sm font-medium text-gray-700 mb-1">Velocidad de Subida (Mbps) <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-arrow-up text-sm"></i></span>
+          <input type="number" id="speed_up" name="speed_up" value="<%= p.speed_up || '' %>" required min="1" step="1"
+            class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="5">
+        </div>
+      </div>
+
+      <!-- Price -->
+      <div>
+        <label for="price" class="block text-sm font-medium text-gray-700 mb-1">Precio Mensual <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-dollar-sign text-sm"></i></span>
+          <input type="number" id="price" name="price" value="<%= p.price || '' %>" required min="0" step="0.01"
+            class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            placeholder="299.00">
+        </div>
+      </div>
+
+      <!-- Active -->
+      <div class="flex items-center">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="active" value="1" <%= (isEdit ? (p.active === 1 || p.active === true) : true) ? 'checked' : '' %>
+            class="w-4 h-4 text-wisp-600 border-gray-300 rounded focus:ring-wisp-500">
+          <span class="text-sm font-medium text-gray-700">Plan activo</span>
+        </label>
+        <p class="text-xs text-gray-400 ml-7">Los planes inactivos no se muestran al crear clientes</p>
+      </div>
+
+      <!-- Description -->
+      <div class="md:col-span-2">
+        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+        <textarea id="description" name="description" rows="3"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none resize-y"
+          placeholder="Descripción del plan (opcional)..."><%= p.description || '' %></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center justify-between">
+    <a href="/plans" class="px-4 py-2.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-arrow-left mr-1"></i> Cancelar
+    </a>
+    <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-save mr-1"></i> <%= isEdit ? 'Guardar Cambios' : 'Crear Plan' %>
+    </button>
+  </div>
+</form>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,224 @@
+<%- include('../partials/header', { currentPage: 'payments', pageTitle: 'Pagos' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Top bar: title + total + add button -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h3 class="text-xl font-bold text-gray-800">Pagos</h3>
+    <p class="text-sm text-gray-500 mt-1">
+      <%= payments.length %> pago<%= payments.length !== 1 ? 's' : '' %> registrado<%= payments.length !== 1 ? 's' : '' %>
+      <% if (typeof totalAmount !== 'undefined' && totalAmount > 0) { %>
+        &middot; Total: <span class="font-semibold text-green-600"><%= currency %><%= Number(totalAmount).toLocaleString('es', {minimumFractionDigits: 2}) %></span>
+      <% } %>
+    </p>
+  </div>
+  <a href="/payments/new" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+    <i class="fas fa-plus"></i> Nuevo Pago
+  </a>
+</div>
+
+<!-- Total amount card -->
+<% if (typeof totalAmount !== 'undefined' && totalAmount > 0) { %>
+<div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-sm text-gray-500">Total Recaudado (filtros aplicados)</p>
+      <p class="text-3xl font-bold text-green-600"><%= currency %><%= Number(totalAmount).toLocaleString('es', {minimumFractionDigits: 2}) %></p>
+    </div>
+    <div class="w-14 h-14 bg-green-100 rounded-lg flex items-center justify-center">
+      <i class="fas fa-money-bill-wave text-green-600 text-2xl"></i>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
+  <form method="GET" action="/payments" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Date from -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+      <input type="date" name="from" value="<%= filters.from || '' %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+    </div>
+
+    <!-- Date to -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+      <input type="date" name="to" value="<%= filters.to || '' %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+    </div>
+
+    <!-- Search -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+      <div class="relative">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-search text-sm"></i></span>
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Nombre del cliente..."
+          class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+    </div>
+
+    <!-- Filter buttons -->
+    <div class="flex items-end gap-2">
+      <button type="submit" class="flex-1 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <i class="fas fa-filter mr-1"></i> Filtrar
+      </button>
+      <a href="/payments" class="px-4 py-2 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm transition-colors">
+        <i class="fas fa-times"></i>
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Payments table -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <% if (payments.length === 0) { %>
+    <div class="p-12 text-center">
+      <i class="fas fa-money-bill-wave text-gray-300 text-5xl mb-4"></i>
+      <p class="text-gray-500 text-lg">No se encontraron pagos</p>
+      <p class="text-gray-400 text-sm mt-1">Ajusta los filtros o registra un nuevo pago</p>
+      <a href="/payments/new" class="inline-flex items-center gap-2 mt-4 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+        <i class="fas fa-plus"></i> Nuevo Pago
+      </a>
+    </div>
+  <% } else { %>
+    <!-- Desktop table -->
+    <div class="hidden lg:block overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b">
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Cliente</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-600">Monto</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Método</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Factura</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Recibo</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% payments.forEach(pay => { %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <!-- Date -->
+            <td class="px-4 py-3 text-gray-700"><%= pay.created_at || pay.date || '--' %></td>
+
+            <!-- Client -->
+            <td class="px-4 py-3">
+              <% if (pay.client_id) { %>
+                <a href="/clients/<%= pay.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600 transition-colors">
+                  <%= pay.first_name %> <%= pay.last_name %>
+                </a>
+              <% } else { %>
+                <span class="text-gray-700"><%= pay.first_name || '' %> <%= pay.last_name || '' %></span>
+              <% } %>
+            </td>
+
+            <!-- Amount -->
+            <td class="px-4 py-3 text-right font-semibold text-green-600">
+              <%= currency %><%= Number(pay.amount || 0).toFixed(2) %>
+            </td>
+
+            <!-- Method -->
+            <td class="px-4 py-3 text-gray-600">
+              <% if (pay.method === 'cash') { %>
+                <span class="text-xs"><i class="fas fa-money-bill text-green-500 mr-1"></i>Efectivo</span>
+              <% } else if (pay.method === 'transfer') { %>
+                <span class="text-xs"><i class="fas fa-exchange-alt text-blue-500 mr-1"></i>Transferencia</span>
+              <% } else if (pay.method === 'card') { %>
+                <span class="text-xs"><i class="fas fa-credit-card text-purple-500 mr-1"></i>Tarjeta</span>
+              <% } else { %>
+                <span class="text-xs"><i class="fas fa-ellipsis-h text-gray-400 mr-1"></i><%= pay.method || 'Otro' %></span>
+              <% } %>
+            </td>
+
+            <!-- Invoice -->
+            <td class="px-4 py-3">
+              <% if (pay.invoice_id) { %>
+                <a href="/invoices/<%= pay.invoice_id %>" class="text-wisp-600 hover:text-wisp-700 font-mono text-xs">#<%= pay.invoice_number || pay.invoice_id %></a>
+              <% } else { %>
+                <span class="text-gray-400">--</span>
+              <% } %>
+            </td>
+
+            <!-- Receipt status -->
+            <td class="px-4 py-3 text-center">
+              <% if (pay.receipt_sent) { %>
+                <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Enviado</span>
+              <% } else { %>
+                <span class="bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full">No enviado</span>
+              <% } %>
+            </td>
+
+            <!-- Actions -->
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-center gap-1">
+                <% if (!pay.receipt_sent) { %>
+                  <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline" onsubmit="return confirm('¿Enviar recibo por WhatsApp?')">
+                    <button type="submit" title="Enviar recibo por WhatsApp" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                      <i class="fab fa-whatsapp"></i>
+                    </button>
+                  </form>
+                <% } else { %>
+                  <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline" onsubmit="return confirm('¿Reenviar recibo por WhatsApp?')">
+                    <button type="submit" title="Reenviar recibo" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                      <i class="fas fa-redo text-xs"></i>
+                    </button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="lg:hidden divide-y">
+      <% payments.forEach(pay => { %>
+      <div class="p-4">
+        <div class="flex items-start justify-between mb-2">
+          <div>
+            <% if (pay.client_id) { %>
+              <a href="/clients/<%= pay.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600"><%= pay.first_name %> <%= pay.last_name %></a>
+            <% } else { %>
+              <span class="font-medium text-gray-800"><%= pay.first_name || '' %> <%= pay.last_name || '' %></span>
+            <% } %>
+            <p class="text-xs text-gray-400 mt-0.5"><%= pay.created_at || pay.date || '' %></p>
+          </div>
+          <p class="font-semibold text-green-600"><%= currency %><%= Number(pay.amount || 0).toFixed(2) %></p>
+        </div>
+        <div class="text-sm text-gray-500 space-y-1">
+          <p>
+            <% if (pay.method === 'cash') { %>
+              <i class="fas fa-money-bill w-4 text-center text-green-500 mr-1"></i>Efectivo
+            <% } else if (pay.method === 'transfer') { %>
+              <i class="fas fa-exchange-alt w-4 text-center text-blue-500 mr-1"></i>Transferencia
+            <% } else if (pay.method === 'card') { %>
+              <i class="fas fa-credit-card w-4 text-center text-purple-500 mr-1"></i>Tarjeta
+            <% } else { %>
+              <i class="fas fa-ellipsis-h w-4 text-center text-gray-400 mr-1"></i><%= pay.method || 'Otro' %>
+            <% } %>
+          </p>
+          <% if (pay.invoice_id) { %>
+            <p><i class="fas fa-file-invoice w-4 text-center mr-1"></i> Factura <a href="/invoices/<%= pay.invoice_id %>" class="text-wisp-600 hover:text-wisp-700 font-mono">#<%= pay.invoice_number || pay.invoice_id %></a></p>
+          <% } %>
+        </div>
+        <div class="flex items-center gap-2 mt-3 pt-3 border-t">
+          <% if (!pay.receipt_sent) { %>
+            <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline" onsubmit="return confirm('¿Enviar recibo?')">
+              <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fab fa-whatsapp mr-1"></i>Enviar Recibo</button>
+            </form>
+          <% } else { %>
+            <span class="text-green-600 text-sm"><i class="fas fa-check mr-1"></i>Recibo enviado</span>
+          <% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
