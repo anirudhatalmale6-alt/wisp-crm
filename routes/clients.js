@@ -1,4 +1,9 @@
 const express = require('express');
+const XLSX = require('xlsx');
+const multer = require('multer');
+const path = require('path');
+
+const upload = multer({ dest: '/tmp/wisp-uploads/' });
 
 module.exports = function(db) {
   const router = express.Router();
@@ -49,6 +54,125 @@ module.exports = function(db) {
     });
 
     res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
+  });
+
+  // Export clients to Excel
+  router.get('/export', (req, res) => {
+    const clients = db.prepare(`SELECT c.*, p.name as plan_name FROM clients c LEFT JOIN plans p ON c.plan_id = p.id ORDER BY c.first_name, c.last_name`).all();
+
+    const data = clients.map(c => ({
+      'Nombre': c.first_name,
+      'Apellido': c.last_name,
+      'Teléfono': c.phone,
+      'Teléfono 2': c.phone2 || '',
+      'Email': c.email || '',
+      'Dirección': c.address || '',
+      'Ciudad': c.city || '',
+      'Sector': c.neighborhood || '',
+      'Plan': c.plan_name || '',
+      'Tipo Conexión': c.connection_type || '',
+      'Usuario PPPoE': c.pppoe_user || '',
+      'Contraseña PPPoE': c.pppoe_password || '',
+      'IP': c.ip_address || '',
+      'MAC': c.mac_address || '',
+      'Router': c.router_name || '',
+      'Fecha Instalación': c.installation_date || '',
+      'Día Cobro': c.billing_day || '',
+      'Estado': c.status || '',
+      'Latitud': c.latitude || '',
+      'Longitud': c.longitude || '',
+      'Notas': c.notes || ''
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Auto-width columns
+    const colWidths = Object.keys(data[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Disposition', `attachment; filename=clientes_${date}.xlsx`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+  });
+
+  // Import clients from Excel
+  router.post('/import', upload.single('file'), (req, res) => {
+    if (!req.file) {
+      req.session.error = 'No se seleccionó ningún archivo';
+      return res.redirect('/clients');
+    }
+
+    try {
+      const wb = XLSX.readFile(req.file.path);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+
+      const plans = db.prepare('SELECT id, name FROM plans').all();
+      const planMap = {};
+      plans.forEach(p => { planMap[p.name.toLowerCase()] = p.id; });
+
+      const insert = db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, address, city, neighborhood,
+        plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
+        installation_date, billing_day, status, latitude, longitude, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      let imported = 0;
+      let skipped = 0;
+
+      const transaction = db.transaction(() => {
+        for (const row of rows) {
+          const firstName = (row['Nombre'] || '').toString().trim();
+          const lastName = (row['Apellido'] || '').toString().trim();
+          const phone = (row['Teléfono'] || row['Telefono'] || '').toString().trim();
+
+          if (!firstName || !phone) {
+            skipped++;
+            continue;
+          }
+
+          const planName = (row['Plan'] || '').toString().trim().toLowerCase();
+          const planId = planMap[planName] || null;
+
+          insert.run(
+            firstName,
+            lastName,
+            phone,
+            (row['Teléfono 2'] || row['Telefono 2'] || '').toString().trim() || null,
+            (row['Email'] || '').toString().trim() || null,
+            (row['Dirección'] || row['Direccion'] || '').toString().trim() || null,
+            (row['Ciudad'] || '').toString().trim() || null,
+            (row['Sector'] || '').toString().trim() || null,
+            planId,
+            (row['Tipo Conexión'] || row['Tipo Conexion'] || 'pppoe').toString().trim(),
+            (row['Usuario PPPoE'] || row['Usuario PPPOE'] || '').toString().trim() || null,
+            (row['Contraseña PPPoE'] || row['Contrasena PPPoE'] || '').toString().trim() || null,
+            (row['IP'] || '').toString().trim() || null,
+            (row['MAC'] || '').toString().trim() || null,
+            (row['Router'] || '').toString().trim() || null,
+            (row['Fecha Instalación'] || row['Fecha Instalacion'] || '').toString().trim() || null,
+            parseInt(row['Día Cobro'] || row['Dia Cobro'] || '1') || 1,
+            (row['Estado'] || 'active').toString().trim(),
+            row['Latitud'] ? parseFloat(row['Latitud']) : null,
+            row['Longitud'] ? parseFloat(row['Longitud']) : null,
+            (row['Notas'] || '').toString().trim() || null
+          );
+          imported++;
+        }
+      });
+
+      transaction();
+
+      req.session.success = `Se importaron ${imported} cliente${imported !== 1 ? 's' : ''} exitosamente` + (skipped > 0 ? ` (${skipped} omitido${skipped !== 1 ? 's' : ''} por datos incompletos)` : '');
+    } catch (err) {
+      req.session.error = 'Error al importar: ' + err.message;
+    }
+
+    res.redirect('/clients');
   });
 
   // New client form

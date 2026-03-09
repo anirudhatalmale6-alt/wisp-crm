@@ -8,9 +8,17 @@
     <h3 class="text-xl font-bold text-gray-800">Lista de Clientes</h3>
     <p class="text-sm text-gray-500 mt-1"><%= clients.length %> cliente<%= clients.length !== 1 ? 's' : '' %> encontrado<%= clients.length !== 1 ? 's' : '' %></p>
   </div>
-  <a href="/clients/new" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
-    <i class="fas fa-user-plus"></i> Nuevo Cliente
-  </a>
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="/clients/export" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-file-excel"></i> Exportar
+    </a>
+    <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-file-upload"></i> Importar
+    </button>
+    <a href="/clients/new" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-user-plus"></i> Nuevo Cliente
+    </a>
+  </div>
 </div>
 
 <!-- Filters -->
@@ -256,6 +264,41 @@
       <% }) %>
     </div>
   <% } %>
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-black bg-opacity-50" onclick="document.getElementById('importModal').classList.add('hidden')"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 relative">
+      <div class="text-center mb-4">
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-4">
+          <i class="fas fa-file-upload text-blue-600 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800">Importar Clientes</h3>
+        <p class="text-sm text-gray-500 mt-1">Sube un archivo Excel (.xlsx) con los datos de los clientes</p>
+      </div>
+      <form method="POST" action="/clients/import" enctype="multipart/form-data">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-4">
+          <input type="file" name="file" accept=".xlsx,.xls" required id="importFile"
+            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+        </div>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <p class="text-xs text-yellow-700"><i class="fas fa-info-circle mr-1"></i>
+            El archivo debe tener las columnas: <strong>Nombre</strong>, <strong>Apellido</strong>, <strong>Teléfono</strong> (obligatorios).
+            Las demás columnas son opcionales. Puedes exportar primero para ver el formato correcto.</p>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-upload mr-1"></i> Importar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <%- include('../partials/footer') %>
