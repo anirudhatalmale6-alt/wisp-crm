@@ -39,6 +39,44 @@
   </div>
 </div>
 
+<!-- Balance Card -->
+<div class="mb-6">
+  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+      <!-- Pending (what they owe) -->
+      <div class="p-5 text-center">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Deuda Pendiente</p>
+        <p class="text-2xl font-bold <%= balance.pending > 0 ? 'text-red-600' : 'text-gray-400' %>">
+          <%= currency %><%= Number(balance.pending).toFixed(2) %>
+        </p>
+        <p class="text-xs text-gray-400 mt-1">Facturas sin pagar</p>
+      </div>
+      <!-- Total Paid -->
+      <div class="p-5 text-center">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total Pagado</p>
+        <p class="text-2xl font-bold text-wisp-600">
+          <%= currency %><%= Number(balance.totalPaid).toFixed(2) %>
+        </p>
+        <p class="text-xs text-gray-400 mt-1">Todos los pagos</p>
+      </div>
+      <!-- Balance -->
+      <div class="p-5 text-center">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Balance</p>
+        <% if (balance.balance > 0) { %>
+          <p class="text-2xl font-bold text-green-600">+<%= currency %><%= Number(balance.balance).toFixed(2) %></p>
+          <p class="text-xs text-green-500 mt-1"><i class="fas fa-check-circle mr-1"></i>Saldo a favor</p>
+        <% } else if (balance.balance < 0) { %>
+          <p class="text-2xl font-bold text-red-600"><%= currency %><%= Number(Math.abs(balance.balance)).toFixed(2) %></p>
+          <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>Debe</p>
+        <% } else { %>
+          <p class="text-2xl font-bold text-gray-500"><%= currency %>0.00</p>
+          <p class="text-xs text-gray-400 mt-1"><i class="fas fa-check-circle mr-1"></i>Al día</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Client Info Cards -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 

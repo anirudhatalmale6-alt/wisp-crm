@@ -9,6 +9,19 @@ module.exports = function(db) {
     return s;
   };
 
+  // Calculate balance for a client: total paid - total invoiced (pending/overdue)
+  const getClientBalance = (clientId) => {
+    const invoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status IN ('pending', 'overdue')`).get(clientId);
+    const paid = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?`).get(clientId);
+    const totalInvoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'`).get(clientId);
+    return {
+      pending: invoiced.total,
+      totalPaid: paid.total,
+      totalInvoiced: totalInvoiced.total,
+      balance: paid.total - totalInvoiced.total // positive = credit, negative = debt
+    };
+  };
+
   // List clients
   router.get('/', (req, res) => {
     const { search, status, plan_id } = req.query;
@@ -27,6 +40,13 @@ module.exports = function(db) {
     sql += ' ORDER BY c.first_name, c.last_name';
     const clients = db.prepare(sql).all(...params);
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
+
+    // Add balance info to each client
+    clients.forEach(c => {
+      const bal = getClientBalance(c.id);
+      c.balance = bal.balance;
+      c.pending = bal.pending;
+    });
 
     res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
   });
@@ -67,8 +87,9 @@ module.exports = function(db) {
     const payments = db.prepare('SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id);
     const messages = db.prepare('SELECT * FROM whatsapp_log WHERE client_id = ? ORDER BY created_at DESC LIMIT 20').all(req.params.id);
     const cuts = db.prepare('SELECT * FROM service_cuts WHERE client_id = ? ORDER BY created_at DESC LIMIT 10').all(req.params.id);
+    const balance = getClientBalance(req.params.id);
 
-    res.render('clients/show', { client, invoices, payments, messages, cuts, settings: getSettings() });
+    res.render('clients/show', { client, invoices, payments, messages, cuts, balance, settings: getSettings() });
   });
 
   // Edit client form

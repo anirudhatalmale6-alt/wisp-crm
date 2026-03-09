@@ -81,6 +81,7 @@
             <th class="text-left px-4 py-3 font-semibold text-gray-600">Contacto</th>
             <th class="text-left px-4 py-3 font-semibold text-gray-600">Plan</th>
             <th class="text-left px-4 py-3 font-semibold text-gray-600">Conexión</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-600">Balance</th>
             <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
             <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
           </tr>
@@ -125,6 +126,20 @@
                 <% } %>
               <% } else { %>
                 <span class="text-gray-400 text-xs">--</span>
+              <% } %>
+            </td>
+
+            <!-- Balance -->
+            <td class="px-4 py-3 text-right">
+              <% if (client.balance > 0) { %>
+                <span class="font-semibold text-green-600">+<%= currency %><%= Number(client.balance).toFixed(2) %></span>
+                <p class="text-xs text-green-500 mt-0.5">A favor</p>
+              <% } else if (client.balance < 0) { %>
+                <span class="font-semibold text-red-600"><%= currency %><%= Number(Math.abs(client.balance)).toFixed(2) %></span>
+                <p class="text-xs text-red-500 mt-0.5">Debe</p>
+              <% } else { %>
+                <span class="font-semibold text-gray-500"><%= currency %>0.00</span>
+                <p class="text-xs text-gray-400 mt-0.5">Al día</p>
               <% } %>
             </td>
 
@@ -203,6 +218,16 @@
           <% if (client.ip_address) { %>
             <p><i class="fas fa-network-wired w-4 text-center mr-1"></i> <span class="font-mono"><%= client.ip_address %></span></p>
           <% } %>
+          <p>
+            <i class="fas fa-wallet w-4 text-center mr-1"></i>
+            <% if (client.balance > 0) { %>
+              <span class="font-semibold text-green-600">+<%= currency %><%= Number(client.balance).toFixed(2) %> (A favor)</span>
+            <% } else if (client.balance < 0) { %>
+              <span class="font-semibold text-red-600">Debe: <%= currency %><%= Number(Math.abs(client.balance)).toFixed(2) %></span>
+            <% } else { %>
+              <span class="text-gray-500">Al día</span>
+            <% } %>
+          </p>
         </div>
         <div class="flex items-center gap-2 mt-3 pt-3 border-t">
           <a href="/clients/<%= client.id %>" class="text-wisp-600 hover:text-wisp-700 text-sm font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
