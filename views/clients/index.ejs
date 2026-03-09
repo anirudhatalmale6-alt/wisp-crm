@@ -163,6 +163,9 @@
                 <a href="/clients/<%= client.id %>/edit" title="Editar" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                   <i class="fas fa-edit"></i>
                 </a>
+                <a href="/payments/new?client_id=<%= client.id %>" title="Efectuar Pago" class="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                  <i class="fas fa-dollar-sign"></i>
+                </a>
                 <% if (client.phone) { %>
                   <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" title="WhatsApp" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
                     <i class="fab fa-whatsapp"></i>
@@ -232,6 +235,7 @@
         <div class="flex items-center gap-2 mt-3 pt-3 border-t">
           <a href="/clients/<%= client.id %>" class="text-wisp-600 hover:text-wisp-700 text-sm font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
           <a href="/clients/<%= client.id %>/edit" class="text-blue-600 hover:text-blue-700 text-sm font-medium"><i class="fas fa-edit mr-1"></i>Editar</a>
+          <a href="/payments/new?client_id=<%= client.id %>" class="text-emerald-600 hover:text-emerald-700 text-sm font-medium"><i class="fas fa-dollar-sign mr-1"></i>Pago</a>
           <% if (client.phone) { %>
             <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</a>
           <% } %>
