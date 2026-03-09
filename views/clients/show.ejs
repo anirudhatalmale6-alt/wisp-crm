@@ -31,7 +31,7 @@
         </button>
       </form>
     <% } %>
-    <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar a <%= client.first_name %> <%= client.last_name %>? Esta acción no se puede deshacer.')">
+    <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
       <button type="submit" class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
         <i class="fas fa-trash"></i> Eliminar
       </button>

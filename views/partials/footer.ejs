@@ -2,5 +2,48 @@
   </div><!-- /p-6 -->
 </main>
 <% } %>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeDeleteModal()"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+          <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">¿Estás seguro?</h3>
+        <p id="deleteModalMsg" class="text-sm text-gray-600 mb-6"></p>
+        <div class="flex gap-3 justify-center">
+          <button onclick="closeDeleteModal()" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancelar
+          </button>
+          <button id="deleteModalConfirm" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-trash mr-1"></i> Sí, Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let deleteForm = null;
+function confirmDelete(form, name) {
+  deleteForm = form;
+  document.getElementById('deleteModalMsg').textContent = 'Vas a eliminar a ' + name + '. Esta acción no se puede deshacer.';
+  document.getElementById('deleteModal').classList.remove('hidden');
+  return false;
+}
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.add('hidden');
+  deleteForm = null;
+}
+document.getElementById('deleteModalConfirm').addEventListener('click', function() {
+  if (deleteForm) {
+    deleteForm.submit();
+  }
+});
+</script>
 </body>
 </html>

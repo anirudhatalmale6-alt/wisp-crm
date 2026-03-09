@@ -181,7 +181,7 @@
                     </button>
                   </form>
                 <% } %>
-                <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar a <%= client.first_name %> <%= client.last_name %>? Esta acción no se puede deshacer.')">
+                <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
                   <button type="submit" title="Eliminar" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <i class="fas fa-trash"></i>
                   </button>
@@ -244,7 +244,7 @@
               <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fas fa-plug mr-1"></i>Reconectar</button>
             </form>
           <% } %>
-          <form method="POST" action="/clients/<%= client.id %>/delete" class="inline ml-auto" onsubmit="return confirm('¿Eliminar cliente? Esta acción no se puede deshacer.')">
+          <form method="POST" action="/clients/<%= client.id %>/delete" class="inline ml-auto" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
             <button type="submit" class="text-red-500 hover:text-red-700 text-sm"><i class="fas fa-trash"></i></button>
           </form>
         </div>
