@@ -1,5 +1,4 @@
 const cron = require('node-cron');
-const MikroTik = require('../lib/mikrotik');
 
 module.exports = function(db) {
   const getSettings = () => {
@@ -47,7 +46,7 @@ module.exports = function(db) {
   });
 
   // Auto-cut service for overdue clients (daily at 8:00 AM)
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('0 8 * * *', () => {
     const settings = getSettings();
     if (settings.auto_cut_enabled !== '1') return;
 
@@ -64,22 +63,19 @@ module.exports = function(db) {
         AND i.due_date < date('now', '-' || ? || ' days')
     `).all(String(graceDays));
 
-    const mk = new MikroTik(settings);
     let cutCount = 0;
 
     for (const client of overdueClients) {
-      // Try MikroTik cut
-      if (mk.isConfigured()) {
-        try {
-          await mk.cutService(client);
-          console.log(`[CRON] MikroTik: cortado ${client.first_name} ${client.last_name}`);
-        } catch (err) {
-          console.error(`[CRON] MikroTik error for ${client.first_name}: ${err.message}`);
-        }
-      }
-
       db.prepare("UPDATE clients SET status = 'suspended' WHERE id = ?").run(client.id);
       db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'cut', 'Corte automático por mora', 1)").run(client.id);
+
+      // Queue MikroTik action
+      db.prepare(`INSERT INTO mikrotik_queue (client_id, action, pppoe_user, ip_address, connection_type, client_name)
+        VALUES (?, 'cut', ?, ?, ?, ?)`).run(
+        client.id, client.pppoe_user || null, client.ip_address || null,
+        client.connection_type || 'pppoe',
+        `${client.first_name} ${client.last_name}`
+      );
       cutCount++;
     }
     console.log(`[CRON] ${cutCount} services cut`);

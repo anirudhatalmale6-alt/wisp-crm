@@ -57,6 +57,22 @@ module.exports = function(db) {
   try { db.exec('ALTER TABLE clients ADD COLUMN longitude REAL'); } catch(e) {}
   try { db.exec('ALTER TABLE clients ADD COLUMN google_maps_link TEXT'); } catch(e) {}
 
+  // MikroTik action queue (for reverse polling)
+  db.exec(`CREATE TABLE IF NOT EXISTS mikrotik_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    pppoe_user TEXT,
+    ip_address TEXT,
+    connection_type TEXT,
+    client_name TEXT,
+    status TEXT DEFAULT 'pending',
+    result TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    executed_at DATETIME,
+    FOREIGN KEY (client_id) REFERENCES clients(id)
+  )`);
+
   // Invoices table
   db.exec(`CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

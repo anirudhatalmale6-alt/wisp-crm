@@ -4,84 +4,34 @@
   function sv(key) {
     return (settings && settings[key] && settings[key].value !== undefined) ? settings[key].value : (settings && settings[key] ? settings[key] : '');
   }
-  const isConfigured = sv('mikrotik_host') && sv('mikrotik_user');
-  const cs = typeof connectionStatus !== 'undefined' ? connectionStatus : null;
+  const pending = typeof pendingCount !== 'undefined' ? pendingCount : 0;
+  const queue = typeof queueItems !== 'undefined' ? queueItems : [];
 %>
 
 <!-- Top bar -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div>
     <h3 class="text-xl font-bold text-gray-800">MikroTik RouterOS</h3>
-    <p class="text-sm text-gray-500 mt-1">Estado de conexión y registro de cortes de servicio</p>
+    <p class="text-sm text-gray-500 mt-1">Cola de acciones y registro de cortes de servicio</p>
   </div>
   <a href="/settings" class="inline-flex items-center gap-2 text-wisp-600 hover:text-wisp-700 text-sm font-medium transition-colors">
     <i class="fas fa-cog"></i> Ir a Configuración
   </a>
 </div>
 
-<!-- Connection Status Card -->
-<div class="bg-white rounded-xl shadow-sm border mb-6">
-  <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
-    <h3 class="font-semibold text-gray-700 flex items-center gap-2">
-      <i class="fas fa-network-wired text-wisp-600"></i> Estado de Conexión
-    </h3>
+<!-- Status Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl shadow-sm border p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Acciones Pendientes</p>
+        <p class="text-2xl font-bold <%= pending > 0 ? 'text-orange-600' : 'text-green-600' %>"><%= pending %></p>
+      </div>
+      <div class="w-12 h-12 <%= pending > 0 ? 'bg-orange-100' : 'bg-green-100' %> rounded-lg flex items-center justify-center">
+        <i class="fas fa-clock <%= pending > 0 ? 'text-orange-600' : 'text-green-600' %> text-xl"></i>
+      </div>
+    </div>
   </div>
-  <div class="p-5">
-    <% if (isConfigured) { %>
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <% if (cs && cs.success) { %>
-            <span class="w-4 h-4 bg-green-500 rounded-full animate-pulse"></span>
-            <span class="text-green-700 font-semibold">Conectado — <%= cs.identity %> (RouterOS <%= cs.version %>)</span>
-          <% } else if (cs && !cs.success) { %>
-            <span class="w-4 h-4 bg-red-500 rounded-full"></span>
-            <span class="text-red-600 font-semibold">Error: <%= cs.error %></span>
-          <% } else { %>
-            <span class="w-4 h-4 bg-yellow-500 rounded-full"></span>
-            <span class="text-yellow-700 font-semibold">Configurado (sin verificar)</span>
-          <% } %>
-        </div>
-        <form method="POST" action="/mikrotik/test" class="inline">
-          <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
-            <i class="fas fa-sync-alt"></i> Probar Conexión
-          </button>
-        </form>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-gray-50 rounded-lg p-3">
-          <p class="text-xs text-gray-500 mb-1">Host / IP</p>
-          <p class="font-mono text-sm text-gray-800"><%= sv('mikrotik_host') %></p>
-        </div>
-        <div class="bg-gray-50 rounded-lg p-3">
-          <p class="text-xs text-gray-500 mb-1">Puerto API</p>
-          <p class="font-mono text-sm text-gray-800"><%= sv('mikrotik_port') || '80' %></p>
-        </div>
-        <div class="bg-gray-50 rounded-lg p-3">
-          <p class="text-xs text-gray-500 mb-1">Usuario</p>
-          <p class="font-mono text-sm text-gray-800"><%= sv('mikrotik_user') %></p>
-        </div>
-        <div class="bg-gray-50 rounded-lg p-3">
-          <p class="text-xs text-gray-500 mb-1">Contraseña</p>
-          <p class="font-mono text-sm text-gray-800">********</p>
-        </div>
-      </div>
-    <% } else { %>
-      <div class="flex items-center gap-3 mb-4">
-        <span class="w-4 h-4 bg-gray-400 rounded-full"></span>
-        <span class="text-gray-500 font-semibold">No configurado</span>
-      </div>
-      <p class="text-sm text-gray-500 mb-4">
-        No se ha configurado la conexión a MikroTik RouterOS. Configure los datos de conexión en la página de ajustes.
-      </p>
-      <a href="/settings" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-        <i class="fas fa-cog"></i> Configurar MikroTik
-      </a>
-    <% } %>
-  </div>
-</div>
-
-<!-- Auto Cut Status -->
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
   <div class="bg-white rounded-xl shadow-sm border p-5">
     <div class="flex items-center justify-between">
       <div>
@@ -109,6 +59,75 @@
     </div>
   </div>
 </div>
+
+<!-- How it works info -->
+<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+  <div class="flex items-start gap-3">
+    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+    <div class="text-sm text-blue-700">
+      <p class="font-semibold mb-1">Cómo funciona la integración</p>
+      <p>El MikroTik revisa automáticamente cada 30 segundos si hay acciones pendientes (cortes o reconexiones) y las ejecuta.
+      Cuando presionas "Cortar" o "Reconectar" en un cliente, la orden se agrega a la cola y el MikroTik la procesa en segundos.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Action Queue -->
+<% if (queue.length > 0) { %>
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+    <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+      <i class="fas fa-list-check text-wisp-600"></i> Cola de Acciones
+      <% if (pending > 0) { %>
+        <span class="bg-orange-100 text-orange-600 text-xs px-2 py-0.5 rounded-full"><%= pending %> pendientes</span>
+      <% } %>
+    </h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-50 border-b">
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Cliente</th>
+          <th class="text-center px-4 py-3 font-semibold text-gray-600">Acción</th>
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Detalle</th>
+          <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        <% queue.forEach(q => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-600 text-xs whitespace-nowrap"><%= q.created_at %></td>
+          <td class="px-4 py-3 font-medium text-gray-800"><%= q.client_name %></td>
+          <td class="px-4 py-3 text-center">
+            <% if (q.action === 'cut') { %>
+              <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Corte</span>
+            <% } else { %>
+              <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Reconexión</span>
+            <% } %>
+          </td>
+          <td class="px-4 py-3 text-gray-500 text-xs font-mono">
+            <% if (q.pppoe_user) { %>PPPoE: <%= q.pppoe_user %><% } %>
+            <% if (q.ip_address) { %>IP: <%= q.ip_address %><% } %>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <% if (q.status === 'pending') { %>
+              <span class="bg-orange-100 text-orange-600 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <i class="fas fa-clock mr-1"></i>Pendiente
+              </span>
+            <% } else { %>
+              <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <i class="fas fa-check mr-1"></i>Ejecutado
+              </span>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
 
 <!-- Service Cuts Log -->
 <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -143,50 +162,25 @@
         <tbody class="divide-y">
           <% cuts.forEach(cut => { %>
           <tr class="hover:bg-gray-50 transition-colors">
-            <!-- Date -->
-            <td class="px-4 py-3 text-gray-700 whitespace-nowrap"><%= cut.created_at || cut.date || '--' %></td>
-
-            <!-- Client -->
+            <td class="px-4 py-3 text-gray-700 whitespace-nowrap"><%= cut.created_at || '--' %></td>
             <td class="px-4 py-3">
-              <% if (cut.client_id) { %>
-                <a href="/clients/<%= cut.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600 transition-colors">
-                  <%= cut.first_name || '' %> <%= cut.last_name || '' %>
-                </a>
-              <% } else { %>
-                <span class="text-gray-700"><%= cut.first_name || '' %> <%= cut.last_name || '' %></span>
-              <% } %>
+              <a href="/clients/<%= cut.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600 transition-colors">
+                <%= cut.first_name || '' %> <%= cut.last_name || '' %>
+              </a>
             </td>
-
-            <!-- Action -->
             <td class="px-4 py-3 text-center">
               <% if (cut.action === 'cut') { %>
-                <span class="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  <i class="fas fa-ban mr-1"></i>Corte
-                </span>
-              <% } else if (cut.action === 'reconnect') { %>
-                <span class="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  <i class="fas fa-plug mr-1"></i>Reconexión
-                </span>
+                <span class="bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full"><i class="fas fa-ban mr-1"></i>Corte</span>
               <% } else { %>
-                <span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  <%= cut.action || '--' %>
-                </span>
+                <span class="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full"><i class="fas fa-plug mr-1"></i>Reconexión</span>
               <% } %>
             </td>
-
-            <!-- Reason -->
             <td class="px-4 py-3 text-gray-600"><%= cut.reason || 'Falta de pago' %></td>
-
-            <!-- Automatic -->
             <td class="px-4 py-3 text-center">
-              <% if (cut.automatic === 1 || cut.automatic === true) { %>
-                <span class="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                  <i class="fas fa-robot mr-1"></i>Automático
-                </span>
+              <% if (cut.automatic === 1) { %>
+                <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full"><i class="fas fa-robot mr-1"></i>Auto</span>
               <% } else { %>
-                <span class="inline-block bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full">
-                  <i class="fas fa-hand-pointer mr-1"></i>Manual
-                </span>
+                <span class="bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>Manual</span>
               <% } %>
             </td>
           </tr>
@@ -201,30 +195,19 @@
       <div class="p-4">
         <div class="flex items-start justify-between mb-2">
           <div>
-            <% if (cut.client_id) { %>
-              <a href="/clients/<%= cut.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600">
-                <%= cut.first_name || '' %> <%= cut.last_name || '' %>
-              </a>
-            <% } else { %>
-              <span class="font-medium text-gray-800"><%= cut.first_name || '' %> <%= cut.last_name || '' %></span>
-            <% } %>
-            <p class="text-xs text-gray-400 mt-0.5"><%= cut.created_at || cut.date || '' %></p>
+            <a href="/clients/<%= cut.client_id %>" class="font-medium text-gray-800 hover:text-wisp-600">
+              <%= cut.first_name || '' %> <%= cut.last_name || '' %>
+            </a>
+            <p class="text-xs text-gray-400 mt-0.5"><%= cut.created_at || '' %></p>
           </div>
           <% if (cut.action === 'cut') { %>
             <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Corte</span>
-          <% } else if (cut.action === 'reconnect') { %>
+          <% } else { %>
             <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Reconexión</span>
           <% } %>
         </div>
-        <div class="text-sm text-gray-500 space-y-1">
+        <div class="text-sm text-gray-500">
           <p><i class="fas fa-comment w-4 text-center mr-1"></i> <%= cut.reason || 'Falta de pago' %></p>
-          <p>
-            <% if (cut.automatic === 1 || cut.automatic === true) { %>
-              <i class="fas fa-robot w-4 text-center text-blue-500 mr-1"></i> Automático
-            <% } else { %>
-              <i class="fas fa-hand-pointer w-4 text-center text-gray-400 mr-1"></i> Manual
-            <% } %>
-          </p>
         </div>
       </div>
       <% }) %>
