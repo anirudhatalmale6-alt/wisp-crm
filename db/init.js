@@ -55,6 +55,7 @@ module.exports = function(db) {
   // Add lat/lng columns if they don't exist (migration for existing DBs)
   try { db.exec('ALTER TABLE clients ADD COLUMN latitude REAL'); } catch(e) {}
   try { db.exec('ALTER TABLE clients ADD COLUMN longitude REAL'); } catch(e) {}
+  try { db.exec('ALTER TABLE clients ADD COLUMN google_maps_link TEXT'); } catch(e) {}
 
   // Invoices table
   db.exec(`CREATE TABLE IF NOT EXISTS invoices (

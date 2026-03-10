@@ -186,8 +186,8 @@ module.exports = function(db) {
     const b = req.body;
     db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, address, city, neighborhood,
       plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
-      installation_date, billing_day, status, latitude, longitude, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      installation_date, billing_day, status, latitude, longitude, google_maps_link, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null,
       b.address || null, b.city || null, b.neighborhood || null,
       b.plan_id || null, b.connection_type || 'pppoe',
@@ -195,7 +195,7 @@ module.exports = function(db) {
       b.mac_address || null, b.router_name || null,
       b.installation_date || null, b.billing_day || 1, b.status || 'active',
       b.latitude ? parseFloat(b.latitude) : null, b.longitude ? parseFloat(b.longitude) : null,
-      b.notes || null
+      b.google_maps_link || null, b.notes || null
     );
     req.session.success = 'Cliente creado exitosamente';
     res.redirect('/clients');
@@ -229,7 +229,7 @@ module.exports = function(db) {
     const b = req.body;
     db.prepare(`UPDATE clients SET first_name=?, last_name=?, phone=?, phone2=?, email=?, address=?, city=?, neighborhood=?,
       plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?,
-      installation_date=?, billing_day=?, status=?, latitude=?, longitude=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(
+      installation_date=?, billing_day=?, status=?, latitude=?, longitude=?, google_maps_link=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(
       b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null,
       b.address || null, b.city || null, b.neighborhood || null,
       b.plan_id || null, b.connection_type || 'pppoe',
@@ -237,7 +237,7 @@ module.exports = function(db) {
       b.mac_address || null, b.router_name || null,
       b.installation_date || null, b.billing_day || 1, b.status || 'active',
       b.latitude ? parseFloat(b.latitude) : null, b.longitude ? parseFloat(b.longitude) : null,
-      b.notes || null, req.params.id
+      b.google_maps_link || null, b.notes || null, req.params.id
     );
     req.session.success = 'Cliente actualizado exitosamente';
     res.redirect('/clients/' + req.params.id);
