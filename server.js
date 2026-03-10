@@ -67,6 +67,9 @@ app.use('/invoices', requireAuth, invoiceRoutes);
 app.use('/payments', requireAuth, paymentRoutes);
 app.use('/whatsapp', requireAuth, whatsappRoutes);
 app.use('/settings', requireAuth, settingsRoutes);
+// MikroTik API endpoints (no auth - called by MikroTik router)
+app.use('/mikrotik/api', mikrotikRoutes);
+// MikroTik web pages (require auth)
 app.use('/mikrotik', requireAuth, mikrotikRoutes);
 
 // Redirect root to dashboard
