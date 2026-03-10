@@ -108,5 +108,47 @@ module.exports = function(db) {
     res.json({ online: true, pending });
   });
 
+  // GET /mikrotik/api/script - Returns a .rsc script that MikroTik can directly import
+  router.get('/api/script', (req, res) => {
+    const actions = db.prepare(`SELECT id, action, pppoe_user, ip_address, connection_type, client_name
+      FROM mikrotik_queue WHERE status = 'pending' ORDER BY created_at ASC`).all();
+
+    if (actions.length === 0) {
+      res.type('text/plain').send('# No hay acciones pendientes');
+      return;
+    }
+
+    const settings = getSettings();
+    const serverUrl = `http://192.168.25.3:3000`;
+    let script = '# CRM Auto-Sync Script\n';
+
+    for (const a of actions) {
+      script += `# ${a.action} - ${a.client_name}\n`;
+
+      if (a.action === 'cut') {
+        if (a.connection_type === 'pppoe' && a.pppoe_user) {
+          script += `:do {/ppp secret set [find name="${a.pppoe_user}"] disabled=yes} on-error={}\n`;
+          script += `:do {/ppp active remove [find name="${a.pppoe_user}"]} on-error={}\n`;
+        }
+        if (a.ip_address && a.connection_type !== 'pppoe') {
+          script += `:do {/ip firewall address-list add list=morosos address=${a.ip_address} comment="${a.client_name} - Corte"} on-error={}\n`;
+        }
+      } else if (a.action === 'reconnect') {
+        if (a.connection_type === 'pppoe' && a.pppoe_user) {
+          script += `:do {/ppp secret set [find name="${a.pppoe_user}"] disabled=no} on-error={}\n`;
+        }
+        if (a.ip_address) {
+          script += `:do {/ip firewall address-list remove [find list=morosos address="${a.ip_address}"]} on-error={}\n`;
+        }
+      }
+
+      // Mark as done
+      db.prepare(`UPDATE mikrotik_queue SET status = 'done', result = 'OK', executed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(a.id);
+    }
+
+    script += `# ${actions.length} acciones procesadas\n`;
+    res.type('text/plain').send(script);
+  });
+
   return router;
 };
