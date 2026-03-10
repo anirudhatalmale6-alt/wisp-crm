@@ -131,14 +131,14 @@ module.exports = function(db) {
           script += `:do {/ppp active remove [find name="${a.pppoe_user}"]} on-error={}\n`;
         }
         if (a.ip_address && a.connection_type !== 'pppoe') {
-          script += `:do {/ip firewall address-list add list=morosos address=${a.ip_address} comment="${a.client_name} - Corte"} on-error={}\n`;
+          script += `:do {/ip firewall address-list add list=MOROSO address=${a.ip_address} comment="${a.client_name} - Corte"} on-error={}\n`;
         }
       } else if (a.action === 'reconnect') {
         if (a.connection_type === 'pppoe' && a.pppoe_user) {
           script += `:do {/ppp secret set [find name="${a.pppoe_user}"] disabled=no} on-error={}\n`;
         }
         if (a.ip_address) {
-          script += `:do {/ip firewall address-list remove [find list=morosos address="${a.ip_address}"]} on-error={}\n`;
+          script += `:do {/ip firewall address-list remove [find list=MOROSO address="${a.ip_address}"]} on-error={}\n`;
         }
       }
 
