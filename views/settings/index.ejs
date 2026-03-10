@@ -176,11 +176,11 @@
 
         <!-- MikroTik Port -->
         <div>
-          <label for="mikrotik_port" class="block text-sm font-medium text-gray-700 mb-1">Puerto API</label>
+          <label for="mikrotik_port" class="block text-sm font-medium text-gray-700 mb-1">Puerto Web (REST API)</label>
           <input type="number" id="mikrotik_port" name="mikrotik_port" value="<%= sv('mikrotik_port') %>" min="1" max="65535"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
-            placeholder="8728">
-          <% if (sd('mikrotik_port')) { %><p class="text-xs text-gray-400 mt-1"><%= sd('mikrotik_port') %></p><% } %>
+            placeholder="80">
+          <p class="text-xs text-gray-400 mt-1">Puerto del servicio www de RouterOS (por defecto 80)</p>
         </div>
 
         <!-- MikroTik User -->

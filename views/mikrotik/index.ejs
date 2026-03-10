@@ -2,9 +2,10 @@
 
 <%
   function sv(key) {
-    return (settings && settings[key] && settings[key].value !== undefined) ? settings[key].value : '';
+    return (settings && settings[key] && settings[key].value !== undefined) ? settings[key].value : (settings && settings[key] ? settings[key] : '');
   }
   const isConfigured = sv('mikrotik_host') && sv('mikrotik_user');
+  const cs = typeof connectionStatus !== 'undefined' ? connectionStatus : null;
 %>
 
 <!-- Top bar -->
@@ -27,9 +28,24 @@
   </div>
   <div class="p-5">
     <% if (isConfigured) { %>
-      <div class="flex items-center gap-3 mb-4">
-        <span class="w-4 h-4 bg-green-500 rounded-full animate-pulse"></span>
-        <span class="text-green-700 font-semibold">Configurado</span>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <% if (cs && cs.success) { %>
+            <span class="w-4 h-4 bg-green-500 rounded-full animate-pulse"></span>
+            <span class="text-green-700 font-semibold">Conectado — <%= cs.identity %> (RouterOS <%= cs.version %>)</span>
+          <% } else if (cs && !cs.success) { %>
+            <span class="w-4 h-4 bg-red-500 rounded-full"></span>
+            <span class="text-red-600 font-semibold">Error: <%= cs.error %></span>
+          <% } else { %>
+            <span class="w-4 h-4 bg-yellow-500 rounded-full"></span>
+            <span class="text-yellow-700 font-semibold">Configurado (sin verificar)</span>
+          <% } %>
+        </div>
+        <form method="POST" action="/mikrotik/test" class="inline">
+          <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-sync-alt"></i> Probar Conexión
+          </button>
+        </form>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-gray-50 rounded-lg p-3">
@@ -38,7 +54,7 @@
         </div>
         <div class="bg-gray-50 rounded-lg p-3">
           <p class="text-xs text-gray-500 mb-1">Puerto API</p>
-          <p class="font-mono text-sm text-gray-800"><%= sv('mikrotik_port') || '8728' %></p>
+          <p class="font-mono text-sm text-gray-800"><%= sv('mikrotik_port') || '80' %></p>
         </div>
         <div class="bg-gray-50 rounded-lg p-3">
           <p class="text-xs text-gray-500 mb-1">Usuario</p>
