@@ -31,9 +31,16 @@
     <button onclick="window.print()" class="inline-flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
       <i class="fas fa-print"></i> Imprimir
     </button>
+    <% if (invoice.status === 'pending' && invoice.phone) { %>
+      <% const waPhoneInv = invoice.phone.replace(/[^0-9]/g, ''); %>
+      <% const waMsgInv = encodeURIComponent(`Hola ${invoice.first_name} ${invoice.last_name}, le saluda ${(settings && settings.company_name) || 'RYV Comunicaciones'}. Le recordamos que tiene una factura pendiente #${invoice.invoice_number || invoice.id} por ${currency}${Number(invoice.amount || 0).toFixed(2)}. Favor realizar el pago a la brevedad. Gracias.`); %>
+      <a href="https://wa.me/<%= waPhoneInv %>?text=<%= waMsgInv %>" target="_blank" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+        <i class="fab fa-whatsapp"></i> Cobrar por WhatsApp
+      </a>
+    <% } %>
     <% if (invoice.status === 'pending') { %>
       <form method="POST" action="/invoices/<%= invoice.id %>/pay" class="inline" onsubmit="return confirm('¿Marcar esta factura como pagada?')">
-        <button type="submit" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <i class="fas fa-check-circle"></i> Registrar Pago
         </button>
       </form>

@@ -175,14 +175,22 @@ module.exports = function(db) {
     res.redirect('/clients');
   });
 
-  // New client form
+  // New client form (admin only)
   router.get('/new', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para crear clientes';
+      return res.redirect('/clients');
+    }
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
     res.render('clients/form', { client: null, plans, settings: getSettings() });
   });
 
-  // Create client
+  // Create client (admin only)
   router.post('/', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para crear clientes';
+      return res.redirect('/clients');
+    }
     const b = req.body;
     db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, address, city, neighborhood,
       plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
@@ -216,16 +224,24 @@ module.exports = function(db) {
     res.render('clients/show', { client, invoices, payments, messages, cuts, balance, settings: getSettings() });
   });
 
-  // Edit client form
+  // Edit client form (admin only)
   router.get('/:id/edit', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para editar clientes';
+      return res.redirect('/clients/' + req.params.id);
+    }
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
     if (!client) return res.redirect('/clients');
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
     res.render('clients/form', { client, plans, settings: getSettings() });
   });
 
-  // Update client
+  // Update client (admin only)
   router.post('/:id', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para editar clientes';
+      return res.redirect('/clients/' + req.params.id);
+    }
     const b = req.body;
     db.prepare(`UPDATE clients SET first_name=?, last_name=?, phone=?, phone2=?, email=?, address=?, city=?, neighborhood=?,
       plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?,
@@ -243,8 +259,12 @@ module.exports = function(db) {
     res.redirect('/clients/' + req.params.id);
   });
 
-  // Delete client
+  // Delete client (admin only)
   router.post('/:id/delete', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para eliminar clientes';
+      return res.redirect('/clients');
+    }
     db.prepare('DELETE FROM whatsapp_log WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM service_cuts WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM payments WHERE client_id = ?').run(req.params.id);

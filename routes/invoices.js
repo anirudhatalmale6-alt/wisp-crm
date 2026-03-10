@@ -37,8 +37,12 @@ module.exports = function(db) {
     res.render('invoices/index', { invoices, filters: req.query, settings: getSettings() });
   });
 
-  // Generate invoices for all active clients
+  // Generate invoices for all active clients (admin only)
   router.post('/generate', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para generar facturas';
+      return res.redirect('/invoices');
+    }
     const settings = getSettings();
     const taxRate = parseFloat(settings.tax_rate || '0') / 100;
     const now = new Date();
@@ -106,8 +110,12 @@ module.exports = function(db) {
     res.redirect(req.body.redirect || '/invoices');
   });
 
-  // Cancel invoice
+  // Cancel invoice (admin only)
   router.post('/:id/cancel', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para cancelar facturas';
+      return res.redirect('/invoices');
+    }
     db.prepare("UPDATE invoices SET status = 'cancelled' WHERE id = ?").run(req.params.id);
     req.session.success = 'Factura cancelada';
     res.redirect('/invoices');

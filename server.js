@@ -38,6 +38,13 @@ function requireAuth(req, res, next) {
   res.redirect('/login');
 }
 
+// Admin-only middleware
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.user && req.session.user.role === 'admin') return next();
+  req.session.error = 'No tiene permisos para realizar esta acción';
+  res.redirect('/dashboard');
+}
+
 // Make session user available to all views
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
@@ -58,6 +65,7 @@ const paymentRoutes = require('./routes/payments')(db);
 const whatsappRoutes = require('./routes/whatsapp')(db);
 const settingsRoutes = require('./routes/settings')(db);
 const mikrotikRoutes = require('./routes/mikrotik')(db);
+const usersRoutes = require('./routes/users')(db);
 
 app.use('/', authRoutes);
 app.use('/dashboard', requireAuth, dashboardRoutes);
@@ -66,7 +74,8 @@ app.use('/plans', requireAuth, planRoutes);
 app.use('/invoices', requireAuth, invoiceRoutes);
 app.use('/payments', requireAuth, paymentRoutes);
 app.use('/whatsapp', requireAuth, whatsappRoutes);
-app.use('/settings', requireAuth, settingsRoutes);
+app.use('/settings', requireAuth, requireAdmin, settingsRoutes);
+app.use('/users', requireAuth, requireAdmin, usersRoutes);
 // MikroTik routes - API endpoints skip auth, web pages require auth
 app.use('/mikrotik', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();

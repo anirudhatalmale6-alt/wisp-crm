@@ -8,12 +8,14 @@
     <h3 class="text-xl font-bold text-gray-800">Facturas</h3>
     <p class="text-sm text-gray-500 mt-1"><%= invoices.length %> factura<%= invoices.length !== 1 ? 's' : '' %> encontrada<%= invoices.length !== 1 ? 's' : '' %></p>
   </div>
+  <% if (user.role === 'admin') { %>
   <form method="POST" action="/invoices/generate" class="inline">
     <button type="submit" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
       onclick="return confirm('¿Generar facturas del mes actual para todos los clientes activos?')">
       <i class="fas fa-file-invoice"></i> Generar Facturas
     </button>
   </form>
+  <% } %>
 </div>
 
 <!-- Filters -->

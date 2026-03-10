@@ -23,8 +23,12 @@ module.exports = function(db) {
     res.render('mikrotik/index', { settings, cuts, queueItems, pendingCount });
   });
 
-  // Manual cut service
+  // Manual cut service (admin only)
   router.post('/cut/:clientId', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para cortar servicio';
+      return res.redirect('/clients');
+    }
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
 
@@ -46,8 +50,12 @@ module.exports = function(db) {
     res.redirect('/clients/' + client.id);
   });
 
-  // Manual reconnect
+  // Manual reconnect (admin only)
   router.post('/reconnect/:clientId', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para reconectar servicio';
+      return res.redirect('/clients');
+    }
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
 

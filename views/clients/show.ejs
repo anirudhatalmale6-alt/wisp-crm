@@ -10,32 +10,38 @@
     <span class="text-gray-700 font-medium"><%= client.first_name %> <%= client.last_name %></span>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
+    <% if (user.role === 'admin') { %>
     <a href="/clients/<%= client.id %>/edit" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
       <i class="fas fa-edit"></i> Editar
     </a>
+    <% } %>
     <% if (client.phone) { %>
-      <a href="https://wa.me/<%= client.phone.replace(/[^0-9]/g, '') %>" target="_blank" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+      <% const waPhone = client.phone.replace(/[^0-9]/g, ''); %>
+      <% const waMsg = encodeURIComponent(`Hola ${client.first_name} ${client.last_name}, le saluda ${(settings && settings.company_name) || 'RYV Comunicaciones'}.`); %>
+      <a href="https://wa.me/<%= waPhone %>?text=<%= waMsg %>" target="_blank" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
         <i class="fab fa-whatsapp"></i> WhatsApp
       </a>
     <% } %>
-    <% if (client.status === 'active') { %>
-      <form method="POST" action="/mikrotik/cut/<%= client.id %>" class="inline" onsubmit="return confirm('¿Cortar servicio a <%= client.first_name %> <%= client.last_name %>?')">
-        <button type="submit" class="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-          <i class="fas fa-ban"></i> Cortar Servicio
-        </button>
-      </form>
-    <% } else if (client.status === 'suspended') { %>
-      <form method="POST" action="/mikrotik/reconnect/<%= client.id %>" class="inline" onsubmit="return confirm('¿Reconectar servicio a <%= client.first_name %> <%= client.last_name %>?')">
-        <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-          <i class="fas fa-plug"></i> Reconectar
+    <% if (user.role === 'admin') { %>
+      <% if (client.status === 'active') { %>
+        <form method="POST" action="/mikrotik/cut/<%= client.id %>" class="inline" onsubmit="return confirm('¿Cortar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+          <button type="submit" class="inline-flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-ban"></i> Cortar Servicio
+          </button>
+        </form>
+      <% } else if (client.status === 'suspended') { %>
+        <form method="POST" action="/mikrotik/reconnect/<%= client.id %>" class="inline" onsubmit="return confirm('¿Reconectar servicio a <%= client.first_name %> <%= client.last_name %>?')">
+          <button type="submit" class="inline-flex items-center gap-1 bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-plug"></i> Reconectar
+          </button>
+        </form>
+      <% } %>
+      <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
+        <button type="submit" class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-trash"></i> Eliminar
         </button>
       </form>
     <% } %>
-    <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
-      <button type="submit" class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-        <i class="fas fa-trash"></i> Eliminar
-      </button>
-    </form>
   </div>
 </div>
 

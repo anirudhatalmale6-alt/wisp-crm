@@ -1,0 +1,182 @@
+<%- include('../partials/header', { currentPage: 'users', pageTitle: 'Usuarios' }) %>
+
+<!-- Top bar -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h3 class="text-xl font-bold text-gray-800">Gestión de Usuarios</h3>
+    <p class="text-sm text-gray-500 mt-1"><%= users.length %> usuario<%= users.length !== 1 ? 's' : '' %> registrado<%= users.length !== 1 ? 's' : '' %></p>
+  </div>
+  <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+    <i class="fas fa-user-plus"></i> Nuevo Usuario
+  </button>
+</div>
+
+<!-- Info box -->
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+  <p class="text-sm text-blue-700">
+    <i class="fas fa-info-circle mr-1"></i>
+    <strong>Admin:</strong> Acceso completo al sistema.
+    <strong>Secretaria:</strong> Solo puede ver información, registrar pagos y enviar mensajes. No puede eliminar clientes, cancelar facturas, ni cambiar configuración.
+  </p>
+</div>
+
+<!-- Users table -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-50 border-b">
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Usuario</th>
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Nombre</th>
+          <th class="text-center px-4 py-3 font-semibold text-gray-600">Rol</th>
+          <th class="text-left px-4 py-3 font-semibold text-gray-600">Creado</th>
+          <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        <% users.forEach(u => { %>
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-4 py-3">
+            <span class="font-mono text-gray-700"><%= u.username %></span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="font-medium text-gray-800"><%= u.name %></span>
+            <% if (u.id === user.id) { %>
+              <span class="ml-1 bg-wisp-100 text-wisp-700 text-xs px-1.5 py-0.5 rounded-full">Tú</span>
+            <% } %>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <% if (u.role === 'admin') { %>
+              <span class="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-shield-alt mr-1"></i>Admin
+              </span>
+            <% } else { %>
+              <span class="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-user mr-1"></i>Secretaria
+              </span>
+            <% } %>
+          </td>
+          <td class="px-4 py-3 text-gray-600 text-xs"><%= u.created_at || '--' %></td>
+          <td class="px-4 py-3 text-center">
+            <% if (u.id !== user.id) { %>
+              <div class="flex items-center justify-center gap-1">
+                <!-- Toggle role -->
+                <form method="POST" action="/users/<%= u.id %>/role" class="inline">
+                  <% if (u.role === 'admin') { %>
+                    <input type="hidden" name="role" value="secretary">
+                    <button type="submit" title="Cambiar a Secretaria" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      onclick="return confirm('¿Cambiar rol a Secretaria?')">
+                      <i class="fas fa-user-minus"></i>
+                    </button>
+                  <% } else { %>
+                    <input type="hidden" name="role" value="admin">
+                    <button type="submit" title="Cambiar a Admin" class="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      onclick="return confirm('¿Cambiar rol a Admin?')">
+                      <i class="fas fa-user-shield"></i>
+                    </button>
+                  <% } %>
+                </form>
+                <!-- Reset password -->
+                <button onclick="openPasswordModal(<%= u.id %>, '<%= u.name %>')" title="Cambiar contraseña" class="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
+                  <i class="fas fa-key"></i>
+                </button>
+                <!-- Delete -->
+                <form method="POST" action="/users/<%= u.id %>/delete" class="inline" onsubmit="return confirm('¿Eliminar el usuario <%= u.name %>?')">
+                  <button type="submit" title="Eliminar" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </div>
+            <% } else { %>
+              <span class="text-xs text-gray-400">--</span>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New User Modal -->
+<div id="newUserModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-black bg-opacity-50" onclick="document.getElementById('newUserModal').classList.add('hidden')"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 relative">
+      <div class="text-center mb-4">
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-wisp-100 mb-4">
+          <i class="fas fa-user-plus text-wisp-600 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800">Crear Nuevo Usuario</h3>
+      </div>
+      <form method="POST" action="/users" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre completo <span class="text-red-500">*</span></label>
+          <input type="text" name="name" required placeholder="Ej: Maria Pérez"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Usuario <span class="text-red-500">*</span></label>
+          <input type="text" name="username" required placeholder="Ej: maria"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña <span class="text-red-500">*</span></label>
+          <input type="password" name="password" required minlength="4" placeholder="Mínimo 4 caracteres"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+          <select name="role" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+            <option value="secretary">Secretaria — acceso limitado</option>
+            <option value="admin">Admin — acceso completo</option>
+          </select>
+        </div>
+        <div class="flex gap-3 justify-end pt-2">
+          <button type="button" onclick="document.getElementById('newUserModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-wisp-600 hover:bg-wisp-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-user-plus mr-1"></i> Crear Usuario
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Password Reset Modal -->
+<div id="passwordModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-black bg-opacity-50" onclick="document.getElementById('passwordModal').classList.add('hidden')"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
+      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-key text-yellow-500 mr-2"></i>Cambiar Contraseña</h3>
+      <p class="text-sm text-gray-500 mb-4">Usuario: <strong id="pwUserName"></strong></p>
+      <form id="passwordForm" method="POST" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña</label>
+          <input type="password" name="new_password" required minlength="4" placeholder="Mínimo 4 caracteres"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" onclick="document.getElementById('passwordModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-save mr-1"></i> Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPasswordModal(userId, userName) {
+  document.getElementById('pwUserName').textContent = userName;
+  document.getElementById('passwordForm').action = '/users/' + userId + '/password';
+  document.getElementById('passwordModal').classList.remove('hidden');
+}
+</script>
+
+<%- include('../partials/footer') %>
