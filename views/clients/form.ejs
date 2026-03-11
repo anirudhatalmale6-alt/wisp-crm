@@ -387,7 +387,36 @@ function clearLocation() {
   if (marker) { map.removeLayer(marker); marker = null; }
 }
 
-function parseGoogleMapsLink() {
+function extractCoordsFromUrl(url) {
+  let lat, lng, match;
+  // Pattern 1: @lat,lng in URL (most common)
+  match = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  // Pattern 2: ?q=lat,lng or ?ll=lat,lng
+  if (!lat) {
+    match = url.match(/[?&](?:q|ll|query)=(-?\d+\.?\d*)[,+](-?\d+\.?\d*)/);
+    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  }
+  // Pattern 3: /place/lat,lng
+  if (!lat) {
+    match = url.match(/\/place\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  }
+  // Pattern 4: maps/dir/lat,lng
+  if (!lat) {
+    match = url.match(/\/dir\/.*?\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  }
+  // Pattern 5: just coordinates pasted directly
+  if (!lat) {
+    match = url.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  }
+  if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+  return null;
+}
+
+async function parseGoogleMapsLink() {
   const link = document.getElementById('google_maps_link').value.trim();
   const status = document.getElementById('gps-status');
   if (!link) {
@@ -395,38 +424,27 @@ function parseGoogleMapsLink() {
     return;
   }
 
-  let lat, lng;
+  // Try to extract from the URL directly first
+  let coords = extractCoordsFromUrl(link);
 
-  // Pattern 1: @lat,lng in URL (most common)
-  let match = link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-  if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
-
-  // Pattern 2: ?q=lat,lng or ?ll=lat,lng
-  if (!lat) {
-    match = link.match(/[?&](?:q|ll|query)=(-?\d+\.?\d*)[,+](-?\d+\.?\d*)/);
-    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  // If no coordinates found and it looks like a shortened URL, resolve it server-side
+  if (!coords && (link.includes('goo.gl') || link.includes('maps.app') || link.includes('g.co'))) {
+    status.innerHTML = '<span class="text-blue-500"><i class="fas fa-spinner fa-spin mr-1"></i>Resolviendo link acortado...</span>';
+    try {
+      const resp = await fetch('/api/resolve-maps-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: link })
+      });
+      const data = await resp.json();
+      if (data.url) {
+        coords = extractCoordsFromUrl(data.url);
+      }
+    } catch(e) {}
   }
 
-  // Pattern 3: /place/lat,lng
-  if (!lat) {
-    match = link.match(/\/place\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
-  }
-
-  // Pattern 4: maps/dir/lat,lng
-  if (!lat) {
-    match = link.match(/\/dir\/.*?\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
-  }
-
-  // Pattern 5: just coordinates pasted directly (lat,lng or lat, lng)
-  if (!lat) {
-    match = link.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
-  }
-
-  if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-    setMarker(lat, lng);
+  if (coords) {
+    setMarker(coords.lat, coords.lng);
     status.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Ubicación extraída del link de Google Maps</span>';
   } else {
     status.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>No se pudieron extraer las coordenadas. Intenta copiar el link completo de Google Maps.</span>';

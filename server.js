@@ -83,6 +83,22 @@ app.use('/mikrotik', (req, res, next) => {
 }, mikrotikRoutes);
 
 // Redirect root to dashboard
+// API: Resolve shortened Google Maps URLs
+app.post('/api/resolve-maps-url', requireAuth, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.json({ error: 'No URL provided' });
+    const response = await axios.get(url, { maxRedirects: 5, timeout: 5000 });
+    res.json({ url: response.request.res.responseUrl || response.config.url || url });
+  } catch (e) {
+    // Even on error, axios may have followed redirects
+    if (e.response && e.request && e.request.res && e.request.res.responseUrl) {
+      return res.json({ url: e.request.res.responseUrl });
+    }
+    res.json({ error: 'Could not resolve URL' });
+  }
+});
+
 app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 
 // Cron jobs for automatic billing and notifications
