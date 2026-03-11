@@ -82,10 +82,52 @@ module.exports = function(db) {
     res.redirect('/invoices');
   });
 
+  // New custom invoice form (admin only)
+  router.get('/new', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para crear facturas';
+      return res.redirect('/invoices');
+    }
+    const clients = db.prepare(`SELECT id, first_name, last_name, phone FROM clients WHERE status != 'inactive' ORDER BY first_name, last_name`).all();
+    res.render('invoices/form', { clients, settings: getSettings(), preselect_client: req.query.client_id || '' });
+  });
+
+  // Create custom invoice (admin only)
+  router.post('/create', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para crear facturas';
+      return res.redirect('/invoices');
+    }
+    const { client_id, concept, amount, due_date, notes } = req.body;
+    if (!client_id || !amount || !due_date) {
+      req.session.error = 'Cliente, monto y fecha de vencimiento son obligatorios';
+      return res.redirect('/invoices/new');
+    }
+
+    const settings = getSettings();
+    const taxRate = parseFloat(settings.tax_rate || '0') / 100;
+    const amt = parseFloat(amount);
+    const tax = amt * taxRate;
+    const total = amt + tax;
+
+    const now = new Date();
+    const periodStart = now.toISOString().split('T')[0];
+    const periodEnd = due_date;
+
+    db.prepare(`INSERT INTO invoices (client_id, invoice_number, period_start, period_end, amount, tax, total, due_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      client_id, generateInvoiceNumber(), periodStart, periodEnd, amt, tax, total, due_date,
+      (concept ? concept + (notes ? '\n' + notes : '') : notes) || null
+    );
+
+    req.session.success = 'Factura personalizada creada exitosamente';
+    res.redirect('/invoices');
+  });
+
   // Single invoice view
   router.get('/:id', (req, res) => {
     const invoice = db.prepare(`SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.email,
-      p.name as plan_name, p.speed_down
+      p.name as plan_name, p.speed_down, p.speed_up
       FROM invoices i JOIN clients c ON i.client_id = c.id
       LEFT JOIN plans p ON c.plan_id = p.id
       WHERE i.id = ?`).get(req.params.id);

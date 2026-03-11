@@ -1,0 +1,130 @@
+<%- include('../partials/header', { currentPage: 'invoices', pageTitle: 'Nueva Factura' }) %>
+
+<% const currency = (settings && settings.currency) ? settings.currency : '$'; %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/invoices" class="hover:text-wisp-600 transition-colors">Facturas</a>
+  <i class="fas fa-chevron-right text-xs"></i>
+  <span class="text-gray-700 font-medium">Nueva Factura Personalizada</span>
+</div>
+
+<form method="POST" action="/invoices/create" class="space-y-6">
+
+  <!-- Invoice Details -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-file-invoice-dollar text-wisp-600"></i> Datos de la Factura
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Client -->
+      <div class="md:col-span-2">
+        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1">Cliente <span class="text-red-500">*</span></label>
+        <select id="client_id" name="client_id" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="">Seleccionar cliente...</option>
+          <% clients.forEach(c => { %>
+            <option value="<%= c.id %>" <%= String(preselect_client) === String(c.id) ? 'selected' : '' %>>
+              <%= c.first_name %> <%= c.last_name %> — <%= c.phone %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <!-- Concept -->
+      <div class="md:col-span-2">
+        <label for="concept" class="block text-sm font-medium text-gray-700 mb-1">Concepto</label>
+        <input type="text" id="concept" name="concept"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Ej: Servicio de Internet Marzo 2026, Instalación, Equipo, etc.">
+      </div>
+
+      <!-- Amount -->
+      <div>
+        <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Monto (<%= currency %>) <span class="text-red-500">*</span></label>
+        <input type="number" id="amount" name="amount" step="0.01" min="0.01" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono"
+          placeholder="0.00" oninput="calcTotal()">
+      </div>
+
+      <!-- Due Date -->
+      <div>
+        <label for="due_date" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento <span class="text-red-500">*</span></label>
+        <input type="date" id="due_date" name="due_date" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+
+      <!-- Notes -->
+      <div class="md:col-span-2">
+        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+        <textarea id="notes" name="notes" rows="2"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none resize-y"
+          placeholder="Notas adicionales (opcional)..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Total Preview -->
+  <% const taxRate = parseFloat((settings && settings.tax_rate) || '0'); %>
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-calculator text-wisp-600"></i> Resumen
+      </h3>
+    </div>
+    <div class="p-5">
+      <div class="space-y-2 text-sm max-w-xs">
+        <div class="flex justify-between">
+          <span class="text-gray-500">Subtotal:</span>
+          <span class="text-gray-700 font-mono" id="preview-subtotal"><%= currency %>0.00</span>
+        </div>
+        <% if (taxRate > 0) { %>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Impuesto (<%= taxRate %>%):</span>
+          <span class="text-gray-700 font-mono" id="preview-tax"><%= currency %>0.00</span>
+        </div>
+        <% } %>
+        <div class="flex justify-between border-t pt-2">
+          <span class="text-gray-800 font-semibold">Total:</span>
+          <span class="text-gray-800 font-bold font-mono text-lg" id="preview-total"><%= currency %>0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center justify-between">
+    <a href="/invoices" class="px-4 py-2.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-arrow-left mr-1"></i> Cancelar
+    </a>
+    <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+      onclick="return confirm('¿Crear esta factura?')">
+      <i class="fas fa-file-invoice mr-1"></i> Crear Factura
+    </button>
+  </div>
+</form>
+
+<script>
+const taxRate = <%= taxRate %> / 100;
+const currency = '<%= currency %>';
+
+function calcTotal() {
+  const amount = parseFloat(document.getElementById('amount').value) || 0;
+  const tax = amount * taxRate;
+  const total = amount + tax;
+  document.getElementById('preview-subtotal').textContent = currency + amount.toFixed(2);
+  <% if (taxRate > 0) { %>
+  document.getElementById('preview-tax').textContent = currency + tax.toFixed(2);
+  <% } %>
+  document.getElementById('preview-total').textContent = currency + total.toFixed(2);
+}
+
+// Set default due date to end of current month
+const now = new Date();
+const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+document.getElementById('due_date').value = lastDay.toISOString().split('T')[0];
+</script>
+
+<%- include('../partials/footer') %>

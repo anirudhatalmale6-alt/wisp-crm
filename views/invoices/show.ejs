@@ -96,7 +96,7 @@
             </div>
             <div class="flex justify-between gap-6">
               <span class="text-gray-500">Periodo:</span>
-              <span class="text-gray-700 font-medium"><%= invoice.period || '--' %></span>
+              <span class="text-gray-700 font-medium"><%= invoice.period_start && invoice.period_end ? invoice.period_start + ' a ' + invoice.period_end : '--' %></span>
             </div>
             <div class="flex justify-between gap-6">
               <span class="text-gray-500">Fecha de Emisión:</span>
@@ -121,32 +121,45 @@
           </tr>
         </thead>
         <tbody class="divide-y">
+          <%
+            // For custom invoices, concept is stored in notes (first line)
+            let conceptText = invoice.plan_name || 'Servicio de Internet';
+            let invoiceNotes = invoice.notes || '';
+            if (!invoice.plan_name && invoice.notes) {
+              const lines = invoice.notes.split('\n');
+              conceptText = lines[0];
+              invoiceNotes = lines.slice(1).join('\n').trim();
+            }
+          %>
           <tr>
             <td class="px-4 py-3">
-              <p class="font-medium text-gray-800"><%= invoice.plan_name || 'Servicio de Internet' %></p>
+              <p class="font-medium text-gray-800"><%= conceptText %></p>
               <% if (invoice.speed_down && invoice.speed_up) { %>
                 <p class="text-xs text-gray-400 mt-0.5"><%= invoice.speed_down %>/<%= invoice.speed_up %> Mbps</p>
               <% } %>
+              <% if (invoiceNotes) { %>
+                <p class="text-xs text-gray-400 mt-0.5"><%= invoiceNotes %></p>
+              <% } %>
             </td>
             <td class="px-4 py-3 text-right text-gray-800">
-              <%= currency %><%= Number(invoice.subtotal || invoice.amount || 0).toFixed(2) %>
+              <%= currency %><%= Number(invoice.amount || 0).toFixed(2) %>
             </td>
           </tr>
         </tbody>
         <tfoot>
-          <% if (invoice.tax_amount && Number(invoice.tax_amount) > 0) { %>
+          <% if (invoice.tax && Number(invoice.tax) > 0) { %>
           <tr class="border-t">
             <td class="px-4 py-2 text-right text-sm text-gray-500">Subtotal</td>
-            <td class="px-4 py-2 text-right text-gray-700"><%= currency %><%= Number(invoice.subtotal || 0).toFixed(2) %></td>
+            <td class="px-4 py-2 text-right text-gray-700"><%= currency %><%= Number(invoice.amount || 0).toFixed(2) %></td>
           </tr>
           <tr>
-            <td class="px-4 py-2 text-right text-sm text-gray-500">Impuesto (<%= invoice.tax_rate || settings.tax_rate || '0' %>%)</td>
-            <td class="px-4 py-2 text-right text-gray-700"><%= currency %><%= Number(invoice.tax_amount || 0).toFixed(2) %></td>
+            <td class="px-4 py-2 text-right text-sm text-gray-500">Impuesto (<%= settings.tax_rate || '0' %>%)</td>
+            <td class="px-4 py-2 text-right text-gray-700"><%= currency %><%= Number(invoice.tax || 0).toFixed(2) %></td>
           </tr>
           <% } %>
           <tr class="border-t-2 bg-gray-50">
             <td class="px-4 py-3 text-right font-bold text-gray-800 text-base">Total</td>
-            <td class="px-4 py-3 text-right font-bold text-gray-800 text-base"><%= currency %><%= Number(invoice.amount || 0).toFixed(2) %></td>
+            <td class="px-4 py-3 text-right font-bold text-gray-800 text-base"><%= currency %><%= Number(invoice.total || invoice.amount || 0).toFixed(2) %></td>
           </tr>
         </tfoot>
       </table>

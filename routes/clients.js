@@ -65,6 +65,7 @@ module.exports = function(db) {
       'Apellido': c.last_name,
       'Teléfono': c.phone,
       'Teléfono 2': c.phone2 || '',
+      'Cédula': c.cedula || '',
       'Email': c.email || '',
       'Dirección': c.address || '',
       'Ciudad': c.city || '',
@@ -116,10 +117,10 @@ module.exports = function(db) {
       const planMap = {};
       plans.forEach(p => { planMap[p.name.toLowerCase()] = p.id; });
 
-      const insert = db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, address, city, neighborhood,
+      const insert = db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, cedula, email, address, city, neighborhood,
         plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
         installation_date, billing_day, status, latitude, longitude, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
       let imported = 0;
       let skipped = 0;
@@ -143,6 +144,7 @@ module.exports = function(db) {
             lastName,
             phone,
             (row['Teléfono 2'] || row['Telefono 2'] || '').toString().trim() || null,
+            (row['Cédula'] || row['Cedula'] || row['ID'] || '').toString().trim() || null,
             (row['Email'] || '').toString().trim() || null,
             (row['Dirección'] || row['Direccion'] || '').toString().trim() || null,
             (row['Ciudad'] || '').toString().trim() || null,
@@ -192,11 +194,11 @@ module.exports = function(db) {
       return res.redirect('/clients');
     }
     const b = req.body;
-    db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, address, city, neighborhood,
+    db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, cedula, address, city, neighborhood,
       plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
       installation_date, billing_day, status, latitude, longitude, google_maps_link, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null, b.cedula || null,
       b.address || null, b.city || null, b.neighborhood || null,
       b.plan_id || null, b.connection_type || 'pppoe',
       b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
@@ -243,10 +245,10 @@ module.exports = function(db) {
       return res.redirect('/clients/' + req.params.id);
     }
     const b = req.body;
-    db.prepare(`UPDATE clients SET first_name=?, last_name=?, phone=?, phone2=?, email=?, address=?, city=?, neighborhood=?,
+    db.prepare(`UPDATE clients SET first_name=?, last_name=?, phone=?, phone2=?, email=?, cedula=?, address=?, city=?, neighborhood=?,
       plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?,
       installation_date=?, billing_day=?, status=?, latitude=?, longitude=?, google_maps_link=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(
-      b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null,
+      b.first_name, b.last_name, b.phone, b.phone2 || null, b.email || null, b.cedula || null,
       b.address || null, b.city || null, b.neighborhood || null,
       b.plan_id || null, b.connection_type || 'pppoe',
       b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,

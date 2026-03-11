@@ -56,6 +56,7 @@ module.exports = function(db) {
   try { db.exec('ALTER TABLE clients ADD COLUMN latitude REAL'); } catch(e) {}
   try { db.exec('ALTER TABLE clients ADD COLUMN longitude REAL'); } catch(e) {}
   try { db.exec('ALTER TABLE clients ADD COLUMN google_maps_link TEXT'); } catch(e) {}
+  try { db.exec('ALTER TABLE clients ADD COLUMN cedula TEXT'); } catch(e) {}
 
   // MikroTik action queue (for reverse polling)
   db.exec(`CREATE TABLE IF NOT EXISTS mikrotik_queue (

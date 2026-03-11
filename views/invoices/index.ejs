@@ -9,12 +9,17 @@
     <p class="text-sm text-gray-500 mt-1"><%= invoices.length %> factura<%= invoices.length !== 1 ? 's' : '' %> encontrada<%= invoices.length !== 1 ? 's' : '' %></p>
   </div>
   <% if (user.role === 'admin') { %>
-  <form method="POST" action="/invoices/generate" class="inline">
-    <button type="submit" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-      onclick="return confirm('¿Generar facturas del mes actual para todos los clientes activos?')">
-      <i class="fas fa-file-invoice"></i> Generar Facturas
-    </button>
-  </form>
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="/invoices/new" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-plus"></i> Nueva Factura
+    </a>
+    <form method="POST" action="/invoices/generate" class="inline">
+      <button type="submit" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+        onclick="return confirm('¿Generar facturas del mes actual para todos los clientes activos?')">
+        <i class="fas fa-file-invoice"></i> Generar Facturas
+      </button>
+    </form>
+  </div>
   <% } %>
 </div>
 
@@ -119,11 +124,11 @@
             </td>
 
             <!-- Period -->
-            <td class="px-4 py-3 text-gray-600"><%= inv.period || '--' %></td>
+            <td class="px-4 py-3 text-gray-600"><%= inv.period_start && inv.period_end ? inv.period_start + ' a ' + inv.period_end : '--' %></td>
 
             <!-- Amount -->
             <td class="px-4 py-3 text-right font-semibold text-gray-800">
-              <%= currency %><%= Number(inv.amount || 0).toFixed(2) %>
+              <%= currency %><%= Number(inv.total || inv.amount || 0).toFixed(2) %>
             </td>
 
             <!-- Status -->
@@ -193,9 +198,9 @@
           <span class="<%= mStatusClass %> text-xs font-semibold px-2 py-0.5 rounded-full"><%= mStatusLabel %></span>
         </div>
         <div class="text-sm text-gray-500 space-y-1">
-          <p><i class="fas fa-calendar w-4 text-center mr-1"></i> <%= inv.period || '--' %></p>
+          <p><i class="fas fa-calendar w-4 text-center mr-1"></i> <%= inv.period_start && inv.period_end ? inv.period_start + ' a ' + inv.period_end : '--' %></p>
           <p><i class="fas fa-clock w-4 text-center mr-1"></i> Vence: <%= inv.due_date || '--' %></p>
-          <p class="font-semibold text-gray-800"><i class="fas fa-dollar-sign w-4 text-center mr-1"></i> <%= currency %><%= Number(inv.amount || 0).toFixed(2) %></p>
+          <p class="font-semibold text-gray-800"><i class="fas fa-dollar-sign w-4 text-center mr-1"></i> <%= currency %><%= Number(inv.total || inv.amount || 0).toFixed(2) %></p>
         </div>
         <div class="flex items-center gap-2 mt-3 pt-3 border-t">
           <a href="/invoices/<%= inv.id %>" class="text-wisp-600 hover:text-wisp-700 text-sm font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
