@@ -267,6 +267,7 @@ module.exports = function(db) {
       req.session.error = 'No tiene permisos para eliminar clientes';
       return res.redirect('/clients');
     }
+    db.prepare('DELETE FROM mikrotik_queue WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM whatsapp_log WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM service_cuts WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM payments WHERE client_id = ?').run(req.params.id);

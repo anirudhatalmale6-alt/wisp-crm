@@ -56,6 +56,7 @@ module.exports = function(db) {
     `).all();
 
     let generated = 0;
+    let autoPaid = 0;
     const insert = db.prepare(`INSERT INTO invoices (client_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
 
@@ -74,11 +75,29 @@ module.exports = function(db) {
       const tax = amount * taxRate;
       const total = amount + tax;
 
-      insert.run(client.id, generateInvoiceNumber(), periodStart, periodEnd, amount, tax, total, dueDate);
+      const result = insert.run(client.id, generateInvoiceNumber(), periodStart, periodEnd, amount, tax, total, dueDate);
       generated++;
+
+      // Auto-pay if client has enough credit (balance a favor)
+      const totalPaid = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?`).get(client.id);
+      const totalInvoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'`).get(client.id);
+      const balance = totalPaid.total - totalInvoiced.total;
+
+      if (balance >= 0) {
+        const invoiceId = result.lastInsertRowid;
+        const today = new Date().toISOString().split('T')[0];
+        db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(today, invoiceId);
+        db.prepare('INSERT INTO payments (client_id, invoice_id, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?)').run(
+          client.id, invoiceId, total, 'credit', 'Pago automático desde saldo a favor'
+        );
+        autoPaid++;
+      }
     }
 
-    req.session.success = `${generated} facturas generadas`;
+    const msg = autoPaid > 0
+      ? `${generated} facturas generadas (${autoPaid} pagadas automáticamente desde saldo a favor)`
+      : `${generated} facturas generadas`;
+    req.session.success = msg;
     res.redirect('/invoices');
   });
 
