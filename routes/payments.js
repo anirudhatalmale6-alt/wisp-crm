@@ -58,13 +58,24 @@ module.exports = function(db) {
       }
     }
 
-    // Reactivate client if suspended
+    // Reactivate client and services if suspended and all invoices paid
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
     if (client && client.status === 'suspended') {
       const pendingCount = db.prepare("SELECT COUNT(*) as count FROM invoices WHERE client_id = ? AND status = 'pending'").get(client_id).count;
       if (pendingCount === 0) {
         db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client_id);
+        db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status = 'suspended'").run(client_id);
         db.prepare("INSERT INTO service_cuts (client_id, action, reason) VALUES (?, 'reconnect', 'Pago recibido - reconexión automática')").run(client_id);
+
+        // Queue reconnect for all services
+        const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client_id);
+        for (const svc of services) {
+          db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+            VALUES (?, ?, 'reconnect', ?, ?, ?, ?)`).run(
+            client_id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+            svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+          );
+        }
       }
     }
 

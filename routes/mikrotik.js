@@ -23,7 +23,7 @@ module.exports = function(db) {
     res.render('mikrotik/index', { settings, cuts, queueItems, pendingCount });
   });
 
-  // Manual cut service (admin only)
+  // Manual cut service (admin only) — supports per-service via ?service_id=
   router.post('/cut/:clientId', (req, res) => {
     if (req.session.user.role !== 'admin') {
       req.session.error = 'No tiene permisos para cortar servicio';
@@ -32,25 +32,59 @@ module.exports = function(db) {
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
 
-    // Update database
-    db.prepare("UPDATE clients SET status = 'suspended' WHERE id = ?").run(client.id);
-    db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'cut', ?, 0)").run(
-      client.id, req.body.reason || 'Corte manual'
-    );
+    const serviceId = req.query.service_id || req.body.service_id;
+    if (serviceId) {
+      // Cut specific service
+      const svc = db.prepare('SELECT * FROM client_services WHERE id = ? AND client_id = ?').get(serviceId, client.id);
+      if (!svc) return res.redirect('/clients/' + client.id);
 
-    // Queue MikroTik action
-    db.prepare(`INSERT INTO mikrotik_queue (client_id, action, pppoe_user, ip_address, connection_type, client_name)
-      VALUES (?, 'cut', ?, ?, ?, ?)`).run(
-      client.id, client.pppoe_user || null, client.ip_address || null,
-      client.connection_type || 'pppoe',
-      `${client.first_name} ${client.last_name}`
-    );
+      db.prepare("UPDATE client_services SET status = 'suspended' WHERE id = ?").run(svc.id);
+      db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'cut', ?, 0)").run(
+        client.id, svc.id, req.body.reason || 'Corte manual'
+      );
+
+      // If all services suspended, suspend client too
+      const activeCount = db.prepare("SELECT COUNT(*) as count FROM client_services WHERE client_id = ? AND status = 'active'").get(client.id).count;
+      if (activeCount === 0) {
+        db.prepare("UPDATE clients SET status = 'suspended' WHERE id = ?").run(client.id);
+      }
+
+      db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+        VALUES (?, ?, 'cut', ?, ?, ?, ?)`).run(
+        client.id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+        svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+      );
+    } else {
+      // Cut all services (legacy behavior)
+      db.prepare("UPDATE clients SET status = 'suspended' WHERE id = ?").run(client.id);
+      db.prepare("UPDATE client_services SET status = 'suspended' WHERE client_id = ? AND status = 'active'").run(client.id);
+      db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'cut', ?, 0)").run(
+        client.id, req.body.reason || 'Corte manual'
+      );
+
+      const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client.id);
+      for (const svc of services) {
+        db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+          VALUES (?, ?, 'cut', ?, ?, ?, ?)`).run(
+          client.id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+          svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+        );
+      }
+      // Fallback: also queue from client record if no services exist
+      if (services.length === 0) {
+        db.prepare(`INSERT INTO mikrotik_queue (client_id, action, pppoe_user, ip_address, connection_type, client_name)
+          VALUES (?, 'cut', ?, ?, ?, ?)`).run(
+          client.id, client.pppoe_user || null, client.ip_address || null,
+          client.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+        );
+      }
+    }
 
     req.session.success = `Servicio cortado para ${client.first_name} ${client.last_name} (orden enviada al MikroTik)`;
     res.redirect('/clients/' + client.id);
   });
 
-  // Manual reconnect (admin only)
+  // Manual reconnect (admin only) — supports per-service via ?service_id=
   router.post('/reconnect/:clientId', (req, res) => {
     if (req.session.user.role !== 'admin') {
       req.session.error = 'No tiene permisos para reconectar servicio';
@@ -59,19 +93,47 @@ module.exports = function(db) {
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
 
-    // Update database
-    db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client.id);
-    db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'reconnect', ?, 0)").run(
-      client.id, req.body.reason || 'Reconexión manual'
-    );
+    const serviceId = req.query.service_id || req.body.service_id;
+    if (serviceId) {
+      // Reconnect specific service
+      const svc = db.prepare('SELECT * FROM client_services WHERE id = ? AND client_id = ?').get(serviceId, client.id);
+      if (!svc) return res.redirect('/clients/' + client.id);
 
-    // Queue MikroTik action
-    db.prepare(`INSERT INTO mikrotik_queue (client_id, action, pppoe_user, ip_address, connection_type, client_name)
-      VALUES (?, 'reconnect', ?, ?, ?, ?)`).run(
-      client.id, client.pppoe_user || null, client.ip_address || null,
-      client.connection_type || 'pppoe',
-      `${client.first_name} ${client.last_name}`
-    );
+      db.prepare("UPDATE client_services SET status = 'active' WHERE id = ?").run(svc.id);
+      db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client.id);
+      db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'reconnect', ?, 0)").run(
+        client.id, svc.id, req.body.reason || 'Reconexión manual'
+      );
+
+      db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+        VALUES (?, ?, 'reconnect', ?, ?, ?, ?)`).run(
+        client.id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+        svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+      );
+    } else {
+      // Reconnect all services (legacy behavior)
+      db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client.id);
+      db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status = 'suspended'").run(client.id);
+      db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'reconnect', ?, 0)").run(
+        client.id, req.body.reason || 'Reconexión manual'
+      );
+
+      const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client.id);
+      for (const svc of services) {
+        db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+          VALUES (?, ?, 'reconnect', ?, ?, ?, ?)`).run(
+          client.id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+          svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+        );
+      }
+      if (services.length === 0) {
+        db.prepare(`INSERT INTO mikrotik_queue (client_id, action, pppoe_user, ip_address, connection_type, client_name)
+          VALUES (?, 'reconnect', ?, ?, ?, ?)`).run(
+          client.id, client.pppoe_user || null, client.ip_address || null,
+          client.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+        );
+      }
+    }
 
     req.session.success = `Servicio reconectado para ${client.first_name} ${client.last_name} (orden enviada al MikroTik)`;
     res.redirect('/clients/' + client.id);

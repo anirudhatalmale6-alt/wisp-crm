@@ -142,75 +142,216 @@
     </div>
   </div>
 
-  <!-- Plan Info -->
-  <div class="bg-white rounded-xl shadow-sm border">
-    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+  <!-- Services Summary -->
+  <div class="bg-white rounded-xl shadow-sm border lg:col-span-2">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
       <h3 class="font-semibold text-gray-700 flex items-center gap-2">
-        <i class="fas fa-cube text-wisp-600"></i> Plan y Facturación
+        <i class="fas fa-cube text-wisp-600"></i> Servicios
+        <span class="bg-wisp-100 text-wisp-700 text-xs font-semibold px-2 py-0.5 rounded-full"><%= services.length %></span>
       </h3>
+      <% if (user.role === 'admin') { %>
+      <button onclick="document.getElementById('add-service-modal').classList.remove('hidden')"
+        class="text-sm bg-wisp-600 hover:bg-wisp-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+        <i class="fas fa-plus mr-1"></i> Agregar Servicio
+      </button>
+      <% } %>
     </div>
-    <div class="p-5 space-y-3 text-sm">
-      <% if (client.plan_name) { %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-wifi w-4 text-center text-gray-400"></i>
-        <div>
-          <p class="text-gray-700 font-medium"><%= client.plan_name %></p>
-          <p class="text-xs text-gray-500"><%= client.speed_down %>/<%= client.speed_up %> Mbps</p>
+    <div class="divide-y">
+      <% if (services.length === 0) { %>
+        <div class="p-8 text-center">
+          <i class="fas fa-cube text-gray-300 text-3xl mb-2"></i>
+          <p class="text-gray-400">Sin servicios. Agrega uno para empezar.</p>
+        </div>
+      <% } %>
+      <% services.forEach((svc, idx) => { %>
+      <div class="p-4 hover:bg-gray-50">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
+              <span class="font-medium text-gray-800 text-sm">
+                <i class="fas fa-wifi text-wisp-500 mr-1"></i>
+                <%= svc.plan_name || 'Sin plan' %>
+              </span>
+              <% if (svc.label) { %>
+                <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full"><%= svc.label %></span>
+              <% } %>
+              <% if (svc.status === 'active') { %>
+                <span class="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full">Activo</span>
+              <% } else if (svc.status === 'suspended') { %>
+                <span class="bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded-full">Suspendido</span>
+              <% } else { %>
+                <span class="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">Inactivo</span>
+              <% } %>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+              <% if (svc.plan_price) { %>
+                <span><i class="fas fa-dollar-sign mr-1"></i><%= currency %><%= Number(svc.plan_price).toFixed(2) %>/mes</span>
+              <% } %>
+              <% if (svc.speed_down) { %>
+                <span><i class="fas fa-tachometer-alt mr-1"></i><%= svc.speed_down %>/<%= svc.speed_up %></span>
+              <% } %>
+              <span class="font-mono bg-gray-100 px-1.5 py-0.5 rounded uppercase"><%= svc.connection_type || 'pppoe' %></span>
+              <% if (svc.ip_address) { %>
+                <span class="font-mono"><i class="fas fa-globe mr-1"></i><%= svc.ip_address %></span>
+              <% } %>
+              <% if (svc.pppoe_user && svc.connection_type === 'pppoe') { %>
+                <span class="font-mono"><i class="fas fa-user-cog mr-1"></i><%= svc.pppoe_user %></span>
+              <% } %>
+              <span><i class="fas fa-calendar-day mr-1"></i>Cobro: dia <%= svc.billing_day || 1 %></span>
+            </div>
+          </div>
+          <% if (user.role === 'admin') { %>
+          <div class="flex items-center gap-1 shrink-0">
+            <button onclick="editService(<%= JSON.stringify(svc).replace(/"/g, '&quot;') %>)"
+              class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="Editar">
+              <i class="fas fa-edit text-xs"></i>
+            </button>
+            <% if (svc.status === 'active') { %>
+              <form method="POST" action="/mikrotik/cut/<%= client.id %>?service_id=<%= svc.id %>" class="inline"
+                onsubmit="return confirm('Cortar este servicio?')">
+                <button type="submit" class="text-orange-500 hover:bg-orange-50 p-1.5 rounded" title="Cortar">
+                  <i class="fas fa-ban text-xs"></i>
+                </button>
+              </form>
+            <% } else if (svc.status === 'suspended') { %>
+              <form method="POST" action="/mikrotik/reconnect/<%= client.id %>?service_id=<%= svc.id %>" class="inline"
+                onsubmit="return confirm('Reconectar este servicio?')">
+                <button type="submit" class="text-green-600 hover:bg-green-50 p-1.5 rounded" title="Reconectar">
+                  <i class="fas fa-plug text-xs"></i>
+                </button>
+              </form>
+            <% } %>
+            <form method="POST" action="/clients/<%= client.id %>/services/<%= svc.id %>/delete" class="inline"
+              onsubmit="return confirm('Eliminar este servicio?')">
+              <button type="submit" class="text-red-500 hover:bg-red-50 p-1.5 rounded" title="Eliminar">
+                <i class="fas fa-trash text-xs"></i>
+              </button>
+            </form>
+          </div>
+          <% } %>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-dollar-sign w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700 font-medium"><%= currency %><%= Number(client.plan_price || 0).toFixed(2) %> <span class="text-gray-400 font-normal">/mes</span></p>
-      </div>
-      <% } else { %>
-      <p class="text-gray-400 text-center py-2">Sin plan asignado</p>
-      <% } %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-calendar-day w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700">Día de cobro: <span class="font-medium"><%= client.billing_day || '--' %></span></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Technical Info -->
-  <div class="bg-white rounded-xl shadow-sm border">
-    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
-      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
-        <i class="fas fa-network-wired text-wisp-600"></i> Conexión
-      </h3>
-    </div>
-    <div class="p-5 space-y-3 text-sm">
-      <div class="flex items-center gap-3">
-        <i class="fas fa-plug w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700">Tipo: <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs uppercase"><%= client.connection_type || '--' %></span></p>
-      </div>
-      <% if (client.ip_address) { %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-globe w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700 font-mono"><%= client.ip_address %></p>
-      </div>
-      <% } %>
-      <% if (client.connection_type === 'pppoe' && client.pppoe_user) { %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-user-cog w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700 font-mono text-xs"><%= client.pppoe_user %></p>
-      </div>
-      <% } %>
-      <% if (client.mac_address) { %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-fingerprint w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700 font-mono text-xs uppercase"><%= client.mac_address %></p>
-      </div>
-      <% } %>
-      <% if (client.router_name) { %>
-      <div class="flex items-center gap-3">
-        <i class="fas fa-router w-4 text-center text-gray-400"></i>
-        <p class="text-gray-700"><%= client.router_name %></p>
-      </div>
-      <% } %>
+      <% }) %>
     </div>
   </div>
 </div>
+
+<!-- Add/Edit Service Modal -->
+<div id="add-service-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.5)">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
+      <h3 id="service-modal-title" class="font-semibold text-gray-700">Agregar Servicio</h3>
+      <button onclick="closeServiceModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="service-form" method="POST" action="/clients/<%= client.id %>/services" class="p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Etiqueta (opcional)</label>
+        <input type="text" name="label" id="svc-label" placeholder="Ej: Casa, Negocio, Oficina..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Plan <span class="text-red-500">*</span></label>
+        <select name="plan_id" id="svc-plan" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="">Seleccionar plan...</option>
+          <% plans.forEach(plan => { %>
+            <option value="<%= plan.id %>"><%= plan.name %> - <%= currency %><%= Number(plan.price).toFixed(2) %> (<%= plan.speed_down %>/<%= plan.speed_up %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo Conexion</label>
+          <select name="connection_type" id="svc-conntype"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+            onchange="toggleSvcPPPoE()">
+            <option value="pppoe">PPPoE</option>
+            <option value="static">IP Estatica</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Dia de Cobro</label>
+          <select name="billing_day" id="svc-billingday"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+            <% for (let d = 1; d <= 28; d++) { %>
+              <option value="<%= d %>"><%= d %></option>
+            <% } %>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">IP</label>
+        <input type="text" name="ip_address" id="svc-ip" placeholder="192.168.1.100"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+      </div>
+      <div id="svc-pppoe-fields">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Usuario PPPoE</label>
+            <input type="text" name="pppoe_user" id="svc-pppoeuser" placeholder="usuario"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Contrasena PPPoE</label>
+            <input type="text" name="pppoe_password" id="svc-pppoepass" placeholder="contrasena"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono">
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">MAC</label>
+          <input type="text" name="mac_address" id="svc-mac" placeholder="AA:BB:CC:DD:EE:FF"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono uppercase">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Router</label>
+          <input type="text" name="router_name" id="svc-router"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Instalacion</label>
+        <input type="date" name="installation_date" id="svc-instdate"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="closeServiceModal()" class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm">Cancelar</button>
+        <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-5 py-2 rounded-lg text-sm font-medium"><i class="fas fa-save mr-1"></i> Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function editService(svc) {
+  document.getElementById('service-modal-title').textContent = 'Editar Servicio';
+  document.getElementById('service-form').action = '/clients/<%= client.id %>/services/' + svc.id;
+  document.getElementById('svc-label').value = svc.label || '';
+  document.getElementById('svc-plan').value = svc.plan_id || '';
+  document.getElementById('svc-conntype').value = svc.connection_type || 'pppoe';
+  document.getElementById('svc-billingday').value = svc.billing_day || 1;
+  document.getElementById('svc-ip').value = svc.ip_address || '';
+  document.getElementById('svc-pppoeuser').value = svc.pppoe_user || '';
+  document.getElementById('svc-pppoepass').value = svc.pppoe_password || '';
+  document.getElementById('svc-mac').value = svc.mac_address || '';
+  document.getElementById('svc-router').value = svc.router_name || '';
+  document.getElementById('svc-instdate').value = svc.installation_date || '';
+  toggleSvcPPPoE();
+  document.getElementById('add-service-modal').classList.remove('hidden');
+}
+function closeServiceModal() {
+  document.getElementById('add-service-modal').classList.add('hidden');
+  document.getElementById('service-modal-title').textContent = 'Agregar Servicio';
+  document.getElementById('service-form').action = '/clients/<%= client.id %>/services';
+  document.getElementById('service-form').reset();
+  toggleSvcPPPoE();
+}
+function toggleSvcPPPoE() {
+  const t = document.getElementById('svc-conntype').value;
+  document.getElementById('svc-pppoe-fields').style.display = t === 'pppoe' ? '' : 'none';
+}
+</script>
 
 <!-- Location Map -->
 <% if (client.latitude && client.longitude) { %>

@@ -117,13 +117,16 @@
               <% } %>
             </td>
 
-            <!-- Plan -->
+            <!-- Plan / Services -->
             <td class="px-4 py-3">
               <% if (client.plan_name) { %>
                 <span class="inline-block bg-wisp-50 text-wisp-700 text-xs font-medium px-2 py-1 rounded-full"><%= client.plan_name %></span>
                 <p class="text-xs text-gray-400 mt-0.5"><%= currency %><%= Number(client.plan_price || 0).toFixed(2) %>/mes</p>
               <% } else { %>
                 <span class="text-gray-400 text-xs">Sin plan</span>
+              <% } %>
+              <% if (client.service_count > 1) { %>
+                <span class="inline-block bg-blue-50 text-blue-600 text-xs px-1.5 py-0.5 rounded-full mt-0.5"><%= client.service_count %> servicios</span>
               <% } %>
             </td>
 

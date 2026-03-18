@@ -58,6 +58,58 @@ module.exports = function(db) {
   try { db.exec('ALTER TABLE clients ADD COLUMN google_maps_link TEXT'); } catch(e) {}
   try { db.exec('ALTER TABLE clients ADD COLUMN cedula TEXT'); } catch(e) {}
 
+  // Client services table (multiple services per client)
+  db.exec(`CREATE TABLE IF NOT EXISTS client_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    label TEXT DEFAULT '',
+    plan_id INTEGER,
+    connection_type TEXT DEFAULT 'pppoe',
+    pppoe_user TEXT,
+    pppoe_password TEXT,
+    ip_address TEXT,
+    mac_address TEXT,
+    router_name TEXT,
+    installation_date DATE,
+    billing_day INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id),
+    FOREIGN KEY (plan_id) REFERENCES plans(id)
+  )`);
+
+  // Add service_id to invoices (nullable for backward compat)
+  try { db.exec('ALTER TABLE invoices ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+
+  // Add service_id to mikrotik_queue
+  try { db.exec('ALTER TABLE mikrotik_queue ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+
+  // Add service_id to service_cuts
+  try { db.exec('ALTER TABLE service_cuts ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+
+  // Migrate existing client service data to client_services table
+  const serviceCount = db.prepare('SELECT COUNT(*) as count FROM client_services').get();
+  if (serviceCount.count === 0) {
+    const clientsWithPlan = db.prepare('SELECT * FROM clients WHERE plan_id IS NOT NULL').all();
+    const insertService = db.prepare(`INSERT INTO client_services
+      (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const c of clientsWithPlan) {
+      insertService.run(
+        c.id, '', c.plan_id, c.connection_type || 'pppoe',
+        c.pppoe_user || null, c.pppoe_password || null, c.ip_address || null,
+        c.mac_address || null, c.router_name || null, c.installation_date || null,
+        c.billing_day || 1, c.status || 'active'
+      );
+    }
+    // Link existing invoices to their service
+    if (clientsWithPlan.length > 0) {
+      db.exec(`UPDATE invoices SET service_id = (
+        SELECT cs.id FROM client_services cs WHERE cs.client_id = invoices.client_id LIMIT 1
+      ) WHERE service_id IS NULL`);
+    }
+  }
+
   // MikroTik action queue (for reverse polling)
   db.exec(`CREATE TABLE IF NOT EXISTS mikrotik_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

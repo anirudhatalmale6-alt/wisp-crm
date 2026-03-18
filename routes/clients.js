@@ -46,11 +46,12 @@ module.exports = function(db) {
     const clients = db.prepare(sql).all(...params);
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
 
-    // Add balance info to each client
+    // Add balance and service count to each client
     clients.forEach(c => {
       const bal = getClientBalance(c.id);
       c.balance = bal.balance;
       c.pending = bal.pending;
+      c.service_count = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(c.id).count;
     });
 
     res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
@@ -207,6 +208,19 @@ module.exports = function(db) {
       b.latitude ? parseFloat(b.latitude) : null, b.longitude ? parseFloat(b.longitude) : null,
       b.google_maps_link || null, b.notes || null
     );
+
+    // Auto-create a service if plan was provided
+    const clientId = db.prepare('SELECT last_insert_rowid() as id').get().id;
+    if (b.plan_id) {
+      db.prepare(`INSERT INTO client_services (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        clientId, '', b.plan_id, b.connection_type || 'pppoe',
+        b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
+        b.mac_address || null, b.router_name || null, b.installation_date || null,
+        b.billing_day || 1, 'active'
+      );
+    }
+
     req.session.success = 'Cliente creado exitosamente';
     res.redirect('/clients');
   });
@@ -217,13 +231,17 @@ module.exports = function(db) {
       FROM clients c LEFT JOIN plans p ON c.plan_id = p.id WHERE c.id = ?`).get(req.params.id);
     if (!client) return res.redirect('/clients');
 
+    const services = db.prepare(`SELECT cs.*, p.name as plan_name, p.price as plan_price, p.speed_down, p.speed_up
+      FROM client_services cs LEFT JOIN plans p ON cs.plan_id = p.id
+      WHERE cs.client_id = ? ORDER BY cs.created_at ASC`).all(req.params.id);
+    const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
     const invoices = db.prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id);
     const payments = db.prepare('SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id);
     const messages = db.prepare('SELECT * FROM whatsapp_log WHERE client_id = ? ORDER BY created_at DESC LIMIT 20').all(req.params.id);
     const cuts = db.prepare('SELECT * FROM service_cuts WHERE client_id = ? ORDER BY created_at DESC LIMIT 10').all(req.params.id);
     const balance = getClientBalance(req.params.id);
 
-    res.render('clients/show', { client, invoices, payments, messages, cuts, balance, settings: getSettings() });
+    res.render('clients/show', { client, services, plans, invoices, payments, messages, cuts, balance, settings: getSettings() });
   });
 
   // Edit client form (admin only)
@@ -261,6 +279,55 @@ module.exports = function(db) {
     res.redirect('/clients/' + req.params.id);
   });
 
+  // ========== Client Services ==========
+
+  // Add service to client
+  router.post('/:id/services', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos';
+      return res.redirect('/clients/' + req.params.id);
+    }
+    const b = req.body;
+    db.prepare(`INSERT INTO client_services (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      req.params.id, b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
+      b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
+      b.mac_address || null, b.router_name || null, b.installation_date || null,
+      b.billing_day || 1, 'active'
+    );
+    req.session.success = 'Servicio agregado exitosamente';
+    res.redirect('/clients/' + req.params.id);
+  });
+
+  // Update service
+  router.post('/:id/services/:serviceId', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos';
+      return res.redirect('/clients/' + req.params.id);
+    }
+    const b = req.body;
+    db.prepare(`UPDATE client_services SET label=?, plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?, installation_date=?, billing_day=? WHERE id=? AND client_id=?`).run(
+      b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
+      b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
+      b.mac_address || null, b.router_name || null, b.installation_date || null,
+      b.billing_day || 1, req.params.serviceId, req.params.id
+    );
+    req.session.success = 'Servicio actualizado';
+    res.redirect('/clients/' + req.params.id);
+  });
+
+  // Delete service
+  router.post('/:id/services/:serviceId/delete', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos';
+      return res.redirect('/clients/' + req.params.id);
+    }
+    db.prepare('DELETE FROM mikrotik_queue WHERE service_id = ?').run(req.params.serviceId);
+    db.prepare('DELETE FROM client_services WHERE id = ? AND client_id = ?').run(req.params.serviceId, req.params.id);
+    req.session.success = 'Servicio eliminado';
+    res.redirect('/clients/' + req.params.id);
+  });
+
   // Delete client (admin only)
   router.post('/:id/delete', (req, res) => {
     if (req.session.user.role !== 'admin') {
@@ -272,6 +339,7 @@ module.exports = function(db) {
     db.prepare('DELETE FROM service_cuts WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM payments WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM invoices WHERE client_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM client_services WHERE client_id = ?').run(req.params.id);
     db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
     req.session.success = 'Cliente eliminado';
     res.redirect('/clients');
