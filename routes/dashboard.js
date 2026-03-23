@@ -52,11 +52,28 @@ module.exports = function(db) {
       ORDER BY count DESC
     `).all();
 
+    // Secretary payments today - payments registered by non-admin users today
+    const today = now.toISOString().split('T')[0];
+    const secretaryPayments = db.prepare(`
+      SELECT p.*, c.first_name, c.last_name, c.phone, u.name as registered_by
+      FROM payments p
+      JOIN clients c ON p.client_id = c.id
+      LEFT JOIN users u ON p.user_id = u.id
+      WHERE p.user_id IS NOT NULL
+        AND u.role != 'admin'
+        AND p.created_at >= ?
+        AND p.created_at <= ?
+      ORDER BY p.created_at DESC
+    `).all(today, today + ' 23:59:59');
+
+    const secretaryTotal = secretaryPayments.reduce((sum, p) => sum + p.amount, 0);
+
     res.render('dashboard', {
       settings,
       totalClients, activeClients, suspendedClients,
       monthlyIncome, pendingInvoices, overdueInvoices, pendingAmount,
-      recentPayments, overdueClients, planDistribution
+      recentPayments, overdueClients, planDistribution,
+      secretaryPayments, secretaryTotal
     });
   });
 

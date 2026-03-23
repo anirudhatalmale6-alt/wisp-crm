@@ -81,6 +81,9 @@ module.exports = function(db) {
   // Add service_id to invoices (nullable for backward compat)
   try { db.exec('ALTER TABLE invoices ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
 
+  // Add user_id to payments (track who registered each payment)
+  try { db.exec('ALTER TABLE payments ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch(e) {}
+
   // Add service_id to mikrotik_queue
   try { db.exec('ALTER TABLE mikrotik_queue ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
 

@@ -2,7 +2,7 @@
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  <div class="bg-white rounded-xl shadow-sm border p-5">
+  <a href="/clients" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Total Clientes</p>
@@ -16,9 +16,9 @@
       <span class="text-green-600"><%= activeClients %> activos</span> &middot;
       <span class="text-red-600"><%= suspendedClients %> suspendidos</span>
     </div>
-  </div>
+  </a>
 
-  <div class="bg-white rounded-xl shadow-sm border p-5">
+  <a href="/payments" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-green-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Ingresos del Mes</p>
@@ -28,9 +28,9 @@
         <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
       </div>
     </div>
-  </div>
+  </a>
 
-  <div class="bg-white rounded-xl shadow-sm border p-5">
+  <a href="/invoices?status=pending" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Facturas Pendientes</p>
@@ -43,9 +43,9 @@
     <div class="mt-2 text-xs text-gray-500">
       Monto: <%= settings.currency || '$' %><%= pendingAmount.toLocaleString('es', {minimumFractionDigits: 2}) %>
     </div>
-  </div>
+  </a>
 
-  <div class="bg-white rounded-xl shadow-sm border p-5">
+  <a href="/invoices?status=overdue" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-red-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Facturas Vencidas</p>
@@ -55,7 +55,7 @@
         <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
       </div>
     </div>
-  </div>
+  </a>
 </div>
 
 <!-- Quick Actions -->
@@ -65,11 +65,6 @@
     <a href="/clients/new" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
       <i class="fas fa-user-plus mr-1"></i> Nuevo Cliente
     </a>
-    <form method="POST" action="/invoices/generate" class="inline">
-      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-        <i class="fas fa-file-invoice mr-1"></i> Generar Facturas del Mes
-      </button>
-    </form>
     <a href="/payments/new" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
       <i class="fas fa-money-bill mr-1"></i> Registrar Pago
     </a>
@@ -135,6 +130,44 @@
     </div>
   </div>
 </div>
+
+<!-- Secretary Payments Today -->
+<% if (secretaryPayments && secretaryPayments.length > 0) { %>
+<div class="bg-white rounded-xl shadow-sm border mt-6">
+  <div class="p-5 border-b flex items-center justify-between">
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-user-clock text-purple-500 mr-2"></i>Cobros de Secretaria - Hoy</h3>
+    <span class="bg-purple-100 text-purple-700 text-sm font-semibold px-3 py-1 rounded-full">
+      Total: <%= settings.currency || '$' %><%= secretaryTotal.toLocaleString('es', {minimumFractionDigits: 2}) %>
+    </span>
+  </div>
+  <div class="p-5">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b">
+            <th class="pb-2 font-medium">Cliente</th>
+            <th class="pb-2 font-medium">Monto</th>
+            <th class="pb-2 font-medium">Metodo</th>
+            <th class="pb-2 font-medium">Registrado por</th>
+            <th class="pb-2 font-medium">Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% secretaryPayments.forEach(p => { %>
+          <tr class="border-b border-gray-100">
+            <td class="py-2"><%= p.first_name %> <%= p.last_name %></td>
+            <td class="py-2 font-semibold text-green-600"><%= settings.currency || '$' %><%= p.amount.toFixed(2) %></td>
+            <td class="py-2 capitalize"><%= p.payment_method %></td>
+            <td class="py-2"><%= p.registered_by || 'N/A' %></td>
+            <td class="py-2 text-gray-500"><%= p.created_at %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <!-- Plan Distribution -->
 <div class="bg-white rounded-xl shadow-sm border mt-6">
