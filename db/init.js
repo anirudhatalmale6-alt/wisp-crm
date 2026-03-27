@@ -226,6 +226,11 @@ module.exports = function(db) {
     ['mikrotik_port', '8728', 'Puerto API del MikroTik'],
     ['mikrotik_user', '', 'Usuario API del MikroTik'],
     ['mikrotik_pass', '', 'Contraseña API del MikroTik'],
+    ['olt_host', '', 'IP de la OLT'],
+    ['olt_port', '22', 'Puerto SSH de la OLT'],
+    ['olt_user', '', 'Usuario SSH de la OLT'],
+    ['olt_pass', '', 'Contraseña SSH de la OLT'],
+    ['olt_model', '', 'Modelo de la OLT'],
   ];
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value, description) VALUES (?, ?, ?)');

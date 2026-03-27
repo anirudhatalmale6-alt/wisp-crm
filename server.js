@@ -66,6 +66,7 @@ const whatsappRoutes = require('./routes/whatsapp')(db);
 const settingsRoutes = require('./routes/settings')(db);
 const mikrotikRoutes = require('./routes/mikrotik')(db);
 const usersRoutes = require('./routes/users')(db);
+const onuRoutes = require('./routes/onu')(db);
 
 app.use('/', authRoutes);
 app.use('/dashboard', requireAuth, dashboardRoutes);
@@ -76,6 +77,7 @@ app.use('/payments', requireAuth, paymentRoutes);
 app.use('/whatsapp', requireAuth, whatsappRoutes);
 app.use('/settings', requireAuth, requireAdmin, settingsRoutes);
 app.use('/users', requireAuth, requireAdmin, usersRoutes);
+app.use('/onu', requireAuth, onuRoutes);
 // MikroTik routes - API endpoints skip auth, web pages require auth
 app.use('/mikrotik', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();

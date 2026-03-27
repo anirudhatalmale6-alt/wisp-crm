@@ -53,6 +53,19 @@ module.exports = function(db) {
     res.redirect('/settings');
   });
 
+  // Update OLT settings
+  router.post('/olt', (req, res) => {
+    const fields = ['olt_host', 'olt_port', 'olt_user', 'olt_pass', 'olt_model'];
+    const update = db.prepare('INSERT OR REPLACE INTO settings (key, value, description) VALUES (?, ?, ?)');
+    for (const key of fields) {
+      if (req.body[key] !== undefined) {
+        update.run(key, req.body[key], key.replace(/_/g, ' '));
+      }
+    }
+    req.session.success = 'Configuracion OLT actualizada';
+    res.redirect('/settings');
+  });
+
   // Update message template
   router.post('/templates/:id', (req, res) => {
     const { content } = req.body;

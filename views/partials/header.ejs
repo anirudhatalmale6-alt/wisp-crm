@@ -70,6 +70,9 @@
     <a href="/mikrotik" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'mikrotik' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
       <i class="fas fa-network-wired w-5 text-center"></i> MikroTik
     </a>
+    <a href="/onu" class="flex items-center gap-3 px-5 py-3 hover:bg-wisp-700 transition-colors <%= typeof currentPage !== 'undefined' && currentPage === 'onu' ? 'bg-wisp-700 border-r-4 border-wisp-300' : '' %>">
+      <i class="fas fa-broadcast-tower w-5 text-center"></i> ONUs
+    </a>
 
     <div class="border-t border-wisp-700 mt-4 pt-4">
       <% if (user.role === 'admin') { %>

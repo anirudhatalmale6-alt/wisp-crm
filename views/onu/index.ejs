@@ -1,0 +1,188 @@
+<%- include('../partials/header', { currentPage: 'onu', pageTitle: 'ONUs - GPON' }) %>
+
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">Gestion de ONUs</h2>
+    <p class="text-sm text-gray-500"><%= settings.olt_model || 'OLT' %> - <%= settings.olt_host || 'No configurada' %></p>
+  </div>
+  <div class="flex gap-2">
+    <button onclick="refreshOnus()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+      <i class="fas fa-sync-alt mr-1"></i> Actualizar
+    </button>
+    <button onclick="document.getElementById('cmdModal').classList.remove('hidden')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+      <i class="fas fa-terminal mr-1"></i> Terminal
+    </button>
+  </div>
+</div>
+
+<% if (error) { %>
+<div class="bg-red-50 border border-red-200 rounded-xl p-5 mb-6">
+  <div class="flex items-start gap-3">
+    <i class="fas fa-exclamation-circle text-red-500 mt-0.5"></i>
+    <div>
+      <p class="font-medium text-red-700">Error</p>
+      <p class="text-sm text-red-600 mt-1"><%= error %></p>
+      <% if (!settings.olt_host) { %>
+        <a href="/settings" class="inline-block mt-2 text-sm text-red-700 underline">Ir a Configuracion</a>
+      <% } %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<% if (connected) { %>
+<!-- Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl shadow-sm border p-5 text-center">
+    <p class="text-sm text-gray-500">Total ONUs</p>
+    <p class="text-3xl font-bold text-purple-600"><%= onus.length %></p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border p-5 text-center">
+    <p class="text-sm text-gray-500">En Linea</p>
+    <p class="text-3xl font-bold text-green-600"><%= onus.filter(o => o.status === 'online' || o.status === 'active').length %></p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border p-5 text-center">
+    <p class="text-sm text-gray-500">Fuera de Linea</p>
+    <p class="text-3xl font-bold text-red-600"><%= onus.filter(o => o.status === 'offline' || o.status === 'inactive' || o.status === 'deactivated').length %></p>
+  </div>
+</div>
+
+<% if (onus.length > 0) { %>
+<!-- ONU Table -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
+  <div class="px-5 py-4 border-b bg-gray-50">
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-broadcast-tower text-purple-500 mr-2"></i>Lista de ONUs</h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-500 border-b bg-gray-50">
+          <th class="px-4 py-3 font-medium">Puerto</th>
+          <th class="px-4 py-3 font-medium">ONU ID</th>
+          <th class="px-4 py-3 font-medium">Serial</th>
+          <th class="px-4 py-3 font-medium">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% onus.forEach(onu => { %>
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono text-xs"><%= onu.port || '-' %></td>
+          <td class="px-4 py-3 font-mono"><%= onu.onuId %></td>
+          <td class="px-4 py-3 font-mono text-xs"><%= onu.sn || '-' %></td>
+          <td class="px-4 py-3">
+            <% if (onu.status === 'online' || onu.status === 'active') { %>
+              <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span> En linea
+              </span>
+            <% } else { %>
+              <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">
+                <span class="w-2 h-2 bg-red-500 rounded-full"></span> Fuera de linea
+              </span>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } else { %>
+<div class="bg-white rounded-xl shadow-sm border p-10 text-center mb-6">
+  <i class="fas fa-search text-gray-300 text-4xl mb-3"></i>
+  <p class="text-gray-500">No se encontraron ONUs con los comandos automaticos.</p>
+  <p class="text-sm text-gray-400 mt-1">Use el terminal para ejecutar comandos manualmente en la OLT.</p>
+</div>
+<% } %>
+
+<!-- Raw Output -->
+<details class="bg-white rounded-xl shadow-sm border mb-6">
+  <summary class="px-5 py-4 cursor-pointer font-semibold text-gray-700 hover:bg-gray-50">
+    <i class="fas fa-code text-gray-400 mr-2"></i>Salida sin procesar (debug)
+  </summary>
+  <div class="p-5 border-t">
+    <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto max-h-96 overflow-y-auto font-mono"><%= rawOutput %></pre>
+  </div>
+</details>
+<% } %>
+
+<!-- Terminal Modal -->
+<div id="cmdModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-700"><i class="fas fa-terminal text-purple-500 mr-2"></i>Terminal OLT</h3>
+      <button onclick="document.getElementById('cmdModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="p-5 flex-1 overflow-y-auto">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Comando</label>
+        <div class="flex gap-2">
+          <input type="text" id="oltCommand" placeholder="show gpon onu state"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+            onkeydown="if(event.key==='Enter')sendCommand()">
+          <button onclick="sendCommand()" id="cmdSendBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+            <i class="fas fa-play mr-1"></i> Ejecutar
+          </button>
+        </div>
+      </div>
+      <div class="mb-3">
+        <p class="text-xs text-gray-400 mb-2">Comandos comunes:</p>
+        <div class="flex flex-wrap gap-1">
+          <button onclick="setCmd('show version')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show version</button>
+          <button onclick="setCmd('show gpon onu state')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu state</button>
+          <button onclick="setCmd('show gpon onu-info all')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu-info all</button>
+          <button onclick="setCmd('show gpon onu uncfg')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu uncfg</button>
+          <button onclick="setCmd('show interface gpon-olt 0/0')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show interface gpon-olt 0/0</button>
+          <button onclick="setCmd('show running-config')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show running-config</button>
+        </div>
+      </div>
+      <div id="cmdOutput" class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs min-h-[200px] max-h-96 overflow-y-auto font-mono whitespace-pre-wrap">
+        Escriba un comando y presione Ejecutar...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setCmd(cmd) {
+  document.getElementById('oltCommand').value = cmd;
+}
+
+async function sendCommand() {
+  const cmd = document.getElementById('oltCommand').value.trim();
+  if (!cmd) return;
+
+  const btn = document.getElementById('cmdSendBtn');
+  const output = document.getElementById('cmdOutput');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Ejecutando...';
+  output.textContent = `Ejecutando: ${cmd}\n\nEsperando respuesta...`;
+
+  try {
+    const resp = await fetch('/onu/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    });
+    const data = await resp.json();
+    if (data.error) {
+      output.textContent = `Error: ${data.error}\n\n${data.output || ''}`;
+    } else {
+      output.textContent = data.output || '(sin salida)';
+    }
+  } catch (e) {
+    output.textContent = `Error: ${e.message}`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-play mr-1"></i> Ejecutar';
+}
+
+function refreshOnus() {
+  window.location.reload();
+}
+</script>
+
+<%- include('../partials/footer') %>
