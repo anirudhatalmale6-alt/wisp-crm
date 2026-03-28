@@ -117,25 +117,29 @@
     </div>
     <div class="p-5 flex-1 overflow-y-auto">
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Comando</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Comando (uno por linea para multiples comandos)</label>
         <div class="flex gap-2">
-          <input type="text" id="oltCommand" placeholder="show gpon onu state"
-            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
-            onkeydown="if(event.key==='Enter')sendCommand()">
-          <button onclick="sendCommand()" id="cmdSendBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+          <textarea id="oltCommand" placeholder="show gpon onu state" rows="2"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-y"
+            onkeydown="if(event.key==='Enter' && event.ctrlKey)sendCommand()"></textarea>
+          <button onclick="sendCommand()" id="cmdSendBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors self-start">
             <i class="fas fa-play mr-1"></i> Ejecutar
           </button>
         </div>
+        <p class="text-xs text-gray-400 mt-1">Ctrl+Enter para ejecutar</p>
       </div>
       <div class="mb-3">
-        <p class="text-xs text-gray-400 mb-2">Comandos comunes:</p>
+        <p class="text-xs text-gray-400 mb-2">Comandos comunes (puedes escribir varios comandos separados por Enter):</p>
         <div class="flex flex-wrap gap-1">
-          <button onclick="setCmd('show version')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show version</button>
+          <button onclick="setCmd('?')" class="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-1 rounded font-bold">? (ayuda)</button>
+          <button onclick="setCmd('show ?')" class="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-1 rounded">show ?</button>
+          <button onclick="setCmd('enable\nshow gpon onu state')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">enable + show gpon onu state</button>
           <button onclick="setCmd('show gpon onu state')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu state</button>
           <button onclick="setCmd('show gpon onu-info all')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu-info all</button>
+          <button onclick="setCmd('show onu status')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show onu status</button>
           <button onclick="setCmd('show gpon onu uncfg')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show gpon onu uncfg</button>
-          <button onclick="setCmd('show interface gpon-olt 0/0')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show interface gpon-olt 0/0</button>
           <button onclick="setCmd('show running-config')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show running-config</button>
+          <button onclick="setCmd('show version')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded">show version</button>
         </div>
       </div>
       <div id="cmdOutput" class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs min-h-[200px] max-h-96 overflow-y-auto font-mono whitespace-pre-wrap">

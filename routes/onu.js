@@ -36,15 +36,25 @@ module.exports = function(db) {
             resolve(output);
           });
 
-          // Send commands with delays for OLT CLI
-          stream.write('enable\n');
+          // Send command directly (no enable - user mode)
+          // Also try enable with password in case it works
           setTimeout(() => {
-            stream.write(command + '\n');
+            stream.write('enable\n');
             setTimeout(() => {
-              stream.write('exit\n');
-              setTimeout(() => stream.end(), 2000);
-            }, 5000);
-          }, 1000);
+              // Try password for enable mode
+              stream.write(settings.olt_pass + '\n');
+              setTimeout(() => {
+                stream.write('terminal length 0\n');
+                setTimeout(() => {
+                  stream.write(command + '\n');
+                  setTimeout(() => {
+                    stream.write('exit\n');
+                    setTimeout(() => stream.end(), 2000);
+                  }, 5000);
+                }, 500);
+              }, 1000);
+            }, 1000);
+          }, 500);
         });
       });
 
@@ -190,6 +200,72 @@ module.exports = function(db) {
     }
   });
 
+  // Execute raw commands on OLT (no auto-enable, sends commands as-is)
+  function execOltRaw(settings, commands, timeout = 15000) {
+    return new Promise((resolve, reject) => {
+      const conn = new Client();
+      let output = '';
+      let timer;
+
+      conn.on('ready', () => {
+        conn.shell((err, stream) => {
+          if (err) { conn.end(); return reject(err); }
+
+          timer = setTimeout(() => {
+            conn.end();
+            resolve(output);
+          }, timeout);
+
+          stream.on('data', (data) => {
+            output += data.toString();
+          });
+
+          stream.on('close', () => {
+            clearTimeout(timer);
+            conn.end();
+            resolve(output);
+          });
+
+          // Send each command with a small delay
+          const cmds = commands.split('\n').filter(c => c.trim());
+          let i = 0;
+          function sendNext() {
+            if (i < cmds.length) {
+              stream.write(cmds[i] + '\n');
+              i++;
+              setTimeout(sendNext, 1000);
+            } else {
+              setTimeout(() => {
+                stream.write('exit\n');
+                setTimeout(() => stream.end(), 2000);
+              }, 5000);
+            }
+          }
+          setTimeout(sendNext, 500);
+        });
+      });
+
+      conn.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+
+      conn.connect({
+        host: settings.olt_host,
+        port: parseInt(settings.olt_port) || 22,
+        username: settings.olt_user,
+        password: settings.olt_pass,
+        readyTimeout: 10000,
+        algorithms: {
+          kex: ['diffie-hellman-group14-sha1', 'diffie-hellman-group1-sha1', 'diffie-hellman-group-exchange-sha256', 'ecdh-sha2-nistp256', 'ecdh-sha2-nistp384', 'ecdh-sha2-nistp521'],
+          cipher: ['aes128-ctr', 'aes192-ctr', 'aes256-ctr', 'aes128-cbc', 'aes256-cbc', '3des-cbc'],
+          hmac: ['hmac-sha2-256', 'hmac-sha1', 'hmac-md5'],
+          serverHostKey: ['ssh-rsa', 'ecdsa-sha2-nistp256', 'ssh-ed25519']
+        }
+      });
+    });
+  }
+
   // API: Execute custom command on OLT
   router.post('/api/command', async (req, res) => {
     const settings = getSettings();
@@ -203,7 +279,7 @@ module.exports = function(db) {
     }
 
     try {
-      const output = await execOltCommand(settings, command, 15000);
+      const output = await execOltRaw(settings, command, 15000);
       res.json({ output, error: null });
     } catch (err) {
       res.json({ output: '', error: err.message });
