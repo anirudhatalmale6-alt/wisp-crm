@@ -57,6 +57,19 @@ module.exports = function(db) {
     res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
   });
 
+  // Live search API
+  router.get('/api/search', (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (q.length < 2) return res.json([]);
+    const s = `%${q}%`;
+    const clients = db.prepare(`SELECT c.id, c.first_name, c.last_name, c.phone, c.status,
+      p.name as plan_name, c.ip_address
+      FROM clients c LEFT JOIN plans p ON c.plan_id = p.id
+      WHERE c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR c.pppoe_user LIKE ? OR c.ip_address LIKE ?
+      ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, s, s, s);
+    res.json(clients);
+  });
+
   // Export clients to Excel
   router.get('/export', (req, res) => {
     const clients = db.prepare(`SELECT c.*, p.name as plan_name FROM clients c LEFT JOIN plans p ON c.plan_id = p.id ORDER BY c.first_name, c.last_name`).all();

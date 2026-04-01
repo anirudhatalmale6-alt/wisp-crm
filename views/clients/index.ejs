@@ -31,8 +31,9 @@
       <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
       <div class="relative">
         <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-search text-sm"></i></span>
-        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Nombre, teléfono, email..."
+        <input type="text" name="search" id="liveSearch" value="<%= filters.search || '' %>" placeholder="Nombre, telefono, email..." autocomplete="off"
           class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        <div id="searchResults" class="hidden absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"></div>
       </div>
     </div>
 
@@ -318,4 +319,38 @@
   </div>
 </div>
 
+<script>
+(function() {
+  var input = document.getElementById('liveSearch');
+  var box = document.getElementById('searchResults');
+  var timer;
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (q.length < 2) { box.classList.add('hidden'); return; }
+    timer = setTimeout(function() {
+      fetch('/clients/api/search?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(clients) {
+          if (!clients.length) { box.innerHTML = '<div class="p-3 text-sm text-gray-400">Sin resultados</div>'; box.classList.remove('hidden'); return; }
+          box.innerHTML = clients.map(function(c) {
+            var statusColor = c.status === 'active' ? 'bg-green-100 text-green-700' : c.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600';
+            return '<a href="/clients/' + c.id + '" class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">' +
+              '<div><span class="font-medium text-gray-800 text-sm">' + c.first_name + ' ' + c.last_name + '</span>' +
+              '<span class="text-xs text-gray-400 ml-2">' + (c.phone || '') + '</span>' +
+              (c.plan_name ? '<span class="text-xs text-wisp-600 ml-2">' + c.plan_name + '</span>' : '') +
+              '</div>' +
+              '<span class="text-xs font-semibold px-2 py-0.5 rounded-full ' + statusColor + '">' + (c.status === 'active' ? 'Activo' : c.status === 'suspended' ? 'Suspendido' : 'Inactivo') + '</span>' +
+              '</a>';
+          }).join('');
+          box.classList.remove('hidden');
+        });
+    }, 250);
+  });
+  document.addEventListener('click', function(e) {
+    if (!input.contains(e.target) && !box.contains(e.target)) box.classList.add('hidden');
+  });
+  input.addEventListener('focus', function() { if (box.innerHTML && input.value.trim().length >= 2) box.classList.remove('hidden'); });
+})();
+</script>
 <%- include('../partials/footer') %>

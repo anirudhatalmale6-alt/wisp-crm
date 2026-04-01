@@ -7,15 +7,19 @@ module.exports = function(db) {
     return s;
   };
 
-  // Auto-generate invoices on the 1st of each month at 6:00 AM (per-service)
-  cron.schedule('0 6 1 * *', () => {
-    console.log('[CRON] Generating monthly invoices...');
-    const settings = getSettings();
-    const taxRate = parseFloat(settings.tax_rate || '0') / 100;
+  // Auto-generate invoices daily at 6:00 AM — only for services whose billing day matches today
+  cron.schedule('0 6 * * *', () => {
     const now = new Date();
+    const today = now.getDate();
     const year = now.getFullYear();
     const month = now.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
 
+    console.log(`[CRON] Checking invoice generation for day ${today}...`);
+    const settings = getSettings();
+    const taxRate = parseFloat(settings.tax_rate || '0') / 100;
+
+    // Get services whose billing day is today (or last day of month if billing day > last day)
     const activeServices = db.prepare(`SELECT cs.*, p.price, c.first_name, c.last_name FROM client_services cs
       JOIN plans p ON cs.plan_id = p.id
       JOIN clients c ON cs.client_id = c.id
@@ -25,18 +29,33 @@ module.exports = function(db) {
     const prefix = `FAC-${year}${String(month + 1).padStart(2, '0')}`;
 
     for (const svc of activeServices) {
+      const billingDay = svc.billing_day || 1;
+      const effectiveBillingDay = Math.min(billingDay, lastDay);
+
+      // Only generate invoice if today is this service's billing day
+      if (today !== effectiveBillingDay) continue;
+
       const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-      const lastDay = new Date(year, month + 1, 0).getDate();
       const periodEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
-      const dueDay = Math.min(svc.billing_day || 1, lastDay);
-      const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+      const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(effectiveBillingDay).padStart(2, '0')}`;
 
       const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
       if (existing) continue;
 
-      const amount = svc.price;
-      const tax = amount * taxRate;
-      const total = amount + tax;
+      // Check if this is the first invoice — prorate if installation_date is this month
+      let amount = svc.price;
+      if (svc.installation_date) {
+        const instDate = new Date(svc.installation_date);
+        if (instDate.getFullYear() === year && instDate.getMonth() === month) {
+          const instDay = instDate.getDate();
+          const daysInMonth = lastDay;
+          const daysActive = daysInMonth - instDay + 1;
+          amount = Math.round((svc.price / daysInMonth) * daysActive * 100) / 100;
+        }
+      }
+
+      const tax = Math.round(amount * taxRate * 100) / 100;
+      const total = Math.round((amount + tax) * 100) / 100;
       const seq = String(++count).padStart(4, '0');
 
       db.prepare(`INSERT INTO invoices (client_id, service_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
@@ -44,7 +63,7 @@ module.exports = function(db) {
         svc.client_id, svc.id, `${prefix}-${seq}`, periodStart, periodEnd, amount, tax, total, dueDate
       );
     }
-    console.log(`[CRON] ${count} invoices generated`);
+    console.log(`[CRON] ${count} invoices generated for day ${today}`);
   });
 
   // Auto-cut service for overdue services (daily at 8:00 AM)

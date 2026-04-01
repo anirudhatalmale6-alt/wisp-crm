@@ -202,7 +202,7 @@
           </div>
           <% if (user.role === 'admin') { %>
           <div class="flex items-center gap-1 shrink-0">
-            <button onclick="editService(<%= JSON.stringify(svc).replace(/"/g, '&quot;') %>)"
+            <button onclick="editService(<%= svc.id %>)"
               class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="Editar">
               <i class="fas fa-edit text-xs"></i>
             </button>
@@ -324,7 +324,10 @@
 </div>
 
 <script>
-function editService(svc) {
+var _services = <%- JSON.stringify(services.map(s => ({id:s.id, label:s.label, plan_id:s.plan_id, connection_type:s.connection_type, billing_day:s.billing_day, ip_address:s.ip_address, pppoe_user:s.pppoe_user, pppoe_password:s.pppoe_password, mac_address:s.mac_address, router_name:s.router_name, installation_date:s.installation_date}))) %>;
+function editService(id) {
+  var svc = _services.find(function(s) { return s.id === id; });
+  if (!svc) return;
   document.getElementById('service-modal-title').textContent = 'Editar Servicio';
   document.getElementById('service-form').action = '/clients/<%= client.id %>/services/' + svc.id;
   document.getElementById('svc-label').value = svc.label || '';
