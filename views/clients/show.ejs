@@ -10,6 +10,9 @@
     <span class="text-gray-700 font-medium"><%= client.first_name %> <%= client.last_name %></span>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
+    <a href="/payments/new?client_id=<%= client.id %>" class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-dollar-sign"></i> Efectuar Pago
+    </a>
     <% if (user.role === 'admin') { %>
     <a href="/clients/<%= client.id %>/edit" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
       <i class="fas fa-edit"></i> Editar
