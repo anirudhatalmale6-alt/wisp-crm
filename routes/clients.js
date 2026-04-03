@@ -35,9 +35,11 @@ module.exports = function(db) {
     const params = [];
 
     if (search) {
-      sql += ` AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR c.pppoe_user LIKE ? OR c.ip_address LIKE ?)`;
+      const cleanSearch = search.replace(/[-() ]/g, '');
+      sql += ` AND (c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ? OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?)`;
       const s = `%${search}%`;
-      params.push(s, s, s, s, s);
+      const sp = `%${cleanSearch}%`;
+      params.push(s, s, sp, s, s);
     }
     if (status) { sql += ` AND c.status = ?`; params.push(status); }
     if (plan_id) { sql += ` AND c.plan_id = ?`; params.push(plan_id); }
@@ -62,11 +64,13 @@ module.exports = function(db) {
     const q = (req.query.q || '').trim();
     if (q.length < 2) return res.json([]);
     const s = `%${q}%`;
+    const cleanQ = q.replace(/[-() ]/g, '');
+    const sp = `%${cleanQ}%`;
     const clients = db.prepare(`SELECT c.id, c.first_name, c.last_name, c.phone, c.status,
       p.name as plan_name, c.ip_address
       FROM clients c LEFT JOIN plans p ON c.plan_id = p.id
-      WHERE c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR c.pppoe_user LIKE ? OR c.ip_address LIKE ?
-      ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, s, s, s);
+      WHERE c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ? OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?
+      ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, sp, s, s);
     res.json(clients);
   });
 

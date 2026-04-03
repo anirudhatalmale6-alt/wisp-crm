@@ -45,7 +45,7 @@ module.exports = function(db) {
     `).all();
 
     const planDistribution = db.prepare(`
-      SELECT p.name, COUNT(c.id) as count
+      SELECT p.id, p.name, COUNT(c.id) as count
       FROM plans p
       LEFT JOIN clients c ON c.plan_id = p.id
       GROUP BY p.id

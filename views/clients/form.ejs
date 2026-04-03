@@ -394,7 +394,7 @@ function extractCoordsFromUrl(url) {
   if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
   // Pattern 2: ?q=lat,lng or ?ll=lat,lng
   if (!lat) {
-    match = url.match(/[?&](?:q|ll|query)=(-?\d+\.?\d*)[,+](-?\d+\.?\d*)/);
+    match = url.match(/[?&](?:q|ll|query|center)=(-?\d+\.?\d*)[,%2C+](-?\d+\.?\d*)/i);
     if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
   }
   // Pattern 3: /place/lat,lng
@@ -407,9 +407,14 @@ function extractCoordsFromUrl(url) {
     match = url.match(/\/dir\/.*?\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
     if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
   }
-  // Pattern 5: just coordinates pasted directly
+  // Pattern 5: data= with lat/lng encoded
   if (!lat) {
-    match = url.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    match = url.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/);
+    if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
+  }
+  // Pattern 6: just coordinates pasted directly (18.4861, -69.9312)
+  if (!lat) {
+    match = url.trim().match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
     if (match) { lat = parseFloat(match[1]); lng = parseFloat(match[2]); }
   }
   if (lat && lng && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
@@ -450,6 +455,11 @@ async function parseGoogleMapsLink() {
     status.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>No se pudieron extraer las coordenadas. Intenta copiar el link completo de Google Maps.</span>';
   }
 }
+
+// Auto-extract when pasting a Google Maps link
+document.getElementById('google_maps_link').addEventListener('paste', function() {
+  setTimeout(function() { parseGoogleMapsLink(); }, 100);
+});
 
 // --- Connection fields ---
 function toggleConnectionFields() {

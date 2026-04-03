@@ -177,10 +177,10 @@
   <div class="p-5">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <% planDistribution.forEach(p => { %>
-      <div class="text-center p-3 bg-gray-50 rounded-lg">
+      <a href="/clients?plan_id=<%= p.id %>" class="text-center p-3 bg-gray-50 rounded-lg hover:bg-teal-50 hover:shadow-md transition-all cursor-pointer block">
         <p class="text-2xl font-bold text-teal-600"><%= p.count %></p>
         <p class="text-sm text-gray-600"><%= p.name %></p>
-      </div>
+      </a>
       <% }) %>
     </div>
   </div>
