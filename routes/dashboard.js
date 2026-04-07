@@ -19,6 +19,19 @@ module.exports = function(db) {
       "SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE created_at >= ? AND created_at <= ?"
     ).get(monthStart, monthEnd + ' 23:59:59').total;
 
+    // Previous month income
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
+    const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
+    const prevMonthIncome = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE created_at >= ? AND created_at <= ?"
+    ).get(prevMonthStart, prevMonthEnd + ' 23:59:59').total;
+
+    // New clients this month
+    const newClientsMonth = db.prepare(
+      "SELECT COUNT(*) as count FROM clients WHERE created_at >= ? AND created_at <= ?"
+    ).get(monthStart, monthEnd + ' 23:59:59').count;
+
     const pendingInvoices = db.prepare("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending'").get().count;
     const overdueInvoices = db.prepare(
       "SELECT COUNT(*) as count FROM invoices WHERE status = 'pending' AND due_date < date('now')"
@@ -71,7 +84,8 @@ module.exports = function(db) {
     res.render('dashboard', {
       settings,
       totalClients, activeClients, suspendedClients,
-      monthlyIncome, pendingInvoices, overdueInvoices, pendingAmount,
+      monthlyIncome, prevMonthIncome, newClientsMonth,
+      pendingInvoices, overdueInvoices, pendingAmount,
       recentPayments, overdueClients, planDistribution,
       secretaryPayments, secretaryTotal
     });

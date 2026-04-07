@@ -58,6 +58,45 @@
   </a>
 </div>
 
+<!-- Stats Cards Row 2 -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <a href="/payments" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Ingreso Mes Anterior</p>
+        <p class="text-2xl font-bold text-purple-600"><%= settings.currency || '$' %><%= prevMonthIncome.toLocaleString('es', {minimumFractionDigits: 2}) %></p>
+      </div>
+      <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-history text-purple-600 text-xl"></i>
+      </div>
+    </div>
+  </a>
+
+  <a href="/clients?status=suspended" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-red-300 transition-all cursor-pointer block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Clientes Suspendidos</p>
+        <p class="text-2xl font-bold text-red-600"><%= suspendedClients %></p>
+      </div>
+      <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-user-slash text-red-600 text-xl"></i>
+      </div>
+    </div>
+  </a>
+
+  <div class="bg-white rounded-xl shadow-sm border p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Nuevos Este Mes</p>
+        <p class="text-2xl font-bold text-teal-600"><%= newClientsMonth %></p>
+      </div>
+      <div class="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-user-plus text-teal-600 text-xl"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Quick Actions -->
 <div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
   <h3 class="font-semibold text-gray-700 mb-3">Acciones Rápidas</h3>
