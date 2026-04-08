@@ -49,28 +49,18 @@ module.exports = function(db) {
       client_id, invoice_id || null, parseFloat(amount), payment_method || 'cash', reference || null, notes || null, userId
     );
 
-    // Mark invoice as paid
-    if (invoice_id) {
-      // Direct payment to a specific invoice
-      const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoice_id);
-      const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE invoice_id = ?').get(invoice_id).total;
-      if (totalPaid >= invoice.total) {
-        const now = new Date().toISOString().split('T')[0];
-        db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(now, invoice_id);
-      }
-    } else {
-      // Payment without specific invoice - auto-apply to oldest pending invoices
-      const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?').get(client_id).total;
-      const pendingInvoices = db.prepare("SELECT * FROM invoices WHERE client_id = ? AND status = 'pending' ORDER BY due_date ASC").all(client_id);
-      let remaining = totalPaid;
-      const today = new Date().toISOString().split('T')[0];
-      for (const inv of pendingInvoices) {
-        if (remaining >= inv.total) {
-          db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(today, inv.id);
-          remaining -= inv.total;
-        } else {
-          break;
-        }
+    // Auto-apply: mark pending invoices as paid based on total payments vs total invoiced
+    const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?').get(client_id).total;
+    const paidInvoicesTotal = db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status = 'paid'").get(client_id).total;
+    let remaining = totalPaid - paidInvoicesTotal;
+    const pendingInvoices = db.prepare("SELECT * FROM invoices WHERE client_id = ? AND status = 'pending' ORDER BY due_date ASC").all(client_id);
+    const today = new Date().toISOString().split('T')[0];
+    for (const inv of pendingInvoices) {
+      if (remaining >= inv.total) {
+        db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(today, inv.id);
+        remaining -= inv.total;
+      } else {
+        break;
       }
     }
 
