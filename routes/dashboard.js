@@ -57,6 +57,18 @@ module.exports = function(db) {
       ORDER BY i.due_date ASC LIMIT 10
     `).all();
 
+    // Clients with pending invoices (grouped by client)
+    const clientsPendingInvoices = db.prepare(`
+      SELECT c.id, c.first_name, c.last_name, c.phone, c.status,
+             COUNT(i.id) as invoice_count, SUM(i.total) as total_pending,
+             MIN(i.due_date) as oldest_due
+      FROM clients c
+      JOIN invoices i ON i.client_id = c.id
+      WHERE i.status = 'pending'
+      GROUP BY c.id
+      ORDER BY total_pending DESC
+    `).all();
+
     const planDistribution = db.prepare(`
       SELECT p.id, p.name, COUNT(c.id) as count
       FROM plans p
@@ -85,7 +97,7 @@ module.exports = function(db) {
       settings,
       totalClients, activeClients, suspendedClients,
       monthlyIncome, prevMonthIncome, newClientsMonth,
-      pendingInvoices, overdueInvoices, pendingAmount,
+      pendingInvoices, overdueInvoices, pendingAmount, clientsPendingInvoices,
       recentPayments, overdueClients, planDistribution,
       secretaryPayments, secretaryTotal
     });

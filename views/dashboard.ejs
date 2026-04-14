@@ -30,7 +30,7 @@
     </div>
   </a>
 
-  <a href="/invoices?status=pending" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer block">
+  <a href="#" onclick="document.getElementById('pendingClientsList').classList.toggle('hidden');return false;" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Facturas Pendientes</p>
@@ -42,6 +42,7 @@
     </div>
     <div class="mt-2 text-xs text-gray-500">
       Monto: <%= settings.currency || '$' %><%= pendingAmount.toLocaleString('es', {minimumFractionDigits: 2}) %>
+      <span class="text-orange-500 ml-1"><i class="fas fa-chevron-down"></i> Ver clientes</span>
     </div>
   </a>
 
@@ -56,6 +57,56 @@
       </div>
     </div>
   </a>
+</div>
+
+<!-- Clients with Pending Invoices (toggleable) -->
+<div id="pendingClientsList" class="hidden bg-white rounded-xl shadow-sm border mb-6 overflow-hidden">
+  <div class="px-5 py-4 border-b bg-orange-50 flex items-center justify-between">
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-file-invoice text-orange-500 mr-2"></i>Clientes con Facturas Pendientes (<%= clientsPendingInvoices.length %>)</h3>
+    <button onclick="document.getElementById('pendingClientsList').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+  </div>
+  <% if (clientsPendingInvoices.length === 0) { %>
+    <div class="p-5 text-center text-gray-400 text-sm">No hay clientes con facturas pendientes</div>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b text-left">
+            <th class="px-4 py-3 font-semibold text-gray-600">Cliente</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Telefono</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Facturas</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-right">Monto Pendiente</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Estado</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% clientsPendingInvoices.forEach(c => { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <a href="/clients/<%= c.id %>" class="font-medium text-gray-800 hover:text-wisp-600"><%= c.first_name %> <%= c.last_name %></a>
+            </td>
+            <td class="px-4 py-3 text-gray-600"><%= c.phone %></td>
+            <td class="px-4 py-3 text-center"><span class="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full"><%= c.invoice_count %></span></td>
+            <td class="px-4 py-3 text-right font-semibold text-red-600"><%= settings.currency || '$' %><%= Number(c.total_pending).toFixed(2) %></td>
+            <td class="px-4 py-3 text-center">
+              <% if (c.status === 'active') { %>
+                <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Activo</span>
+              <% } else if (c.status === 'suspended') { %>
+                <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Suspendido</span>
+              <% } else { %>
+                <span class="bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">Inactivo</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <a href="/payments/new?client_id=<%= c.id %>" class="text-emerald-600 hover:text-emerald-700 text-sm font-medium"><i class="fas fa-dollar-sign mr-1"></i>Pago</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
 </div>
 
 <!-- Stats Cards Row 2 -->

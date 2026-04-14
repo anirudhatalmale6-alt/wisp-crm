@@ -29,7 +29,7 @@ module.exports = function(db) {
 
   // List clients
   router.get('/', (req, res) => {
-    const { search, status, plan_id } = req.query;
+    const { search, status, plan_id, sort } = req.query;
     let sql = `SELECT c.*, p.name as plan_name, p.price as plan_price, p.speed_down
                FROM clients c LEFT JOIN plans p ON c.plan_id = p.id WHERE 1=1`;
     const params = [];
@@ -44,7 +44,15 @@ module.exports = function(db) {
     if (status) { sql += ` AND c.status = ?`; params.push(status); }
     if (plan_id) { sql += ` AND c.plan_id = ?`; params.push(plan_id); }
 
-    sql += ' ORDER BY c.first_name, c.last_name';
+    const sortOptions = {
+      'name': 'c.first_name, c.last_name',
+      'name_desc': 'c.first_name DESC, c.last_name DESC',
+      'phone': 'c.phone',
+      'date': 'c.created_at DESC',
+      'date_asc': 'c.created_at ASC',
+      'status': 'c.status, c.first_name'
+    };
+    sql += ' ORDER BY ' + (sortOptions[sort] || 'c.first_name, c.last_name');
     const clients = db.prepare(sql).all(...params);
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
 
@@ -55,6 +63,10 @@ module.exports = function(db) {
       c.pending = bal.pending;
       c.service_count = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(c.id).count;
     });
+
+    // Sort by balance if requested (needs post-query sort since balance is calculated)
+    if (sort === 'balance') clients.sort((a, b) => a.balance - b.balance);
+    if (sort === 'balance_desc') clients.sort((a, b) => b.balance - a.balance);
 
     res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
   });

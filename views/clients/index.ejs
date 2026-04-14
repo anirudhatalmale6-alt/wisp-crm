@@ -25,7 +25,7 @@
 
 <!-- Filters -->
 <div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
-  <form method="GET" action="/clients" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <form method="GET" action="/clients" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
     <!-- Search -->
     <div>
       <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
@@ -56,6 +56,21 @@
         <% plans.forEach(plan => { %>
           <option value="<%= plan.id %>" <%= String(filters.plan_id) === String(plan.id) ? 'selected' : '' %>><%= plan.name %></option>
         <% }) %>
+      </select>
+    </div>
+
+    <!-- Sort -->
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Ordenar por</label>
+      <select name="sort" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+        <option value="name" <%= (filters.sort || 'name') === 'name' ? 'selected' : '' %>>Nombre A-Z</option>
+        <option value="name_desc" <%= filters.sort === 'name_desc' ? 'selected' : '' %>>Nombre Z-A</option>
+        <option value="phone" <%= filters.sort === 'phone' ? 'selected' : '' %>>Telefono</option>
+        <option value="balance" <%= filters.sort === 'balance' ? 'selected' : '' %>>Balance (debe mas)</option>
+        <option value="balance_desc" <%= filters.sort === 'balance_desc' ? 'selected' : '' %>>Balance (a favor)</option>
+        <option value="date" <%= filters.sort === 'date' ? 'selected' : '' %>>Mas recientes</option>
+        <option value="date_asc" <%= filters.sort === 'date_asc' ? 'selected' : '' %>>Mas antiguos</option>
+        <option value="status" <%= filters.sort === 'status' ? 'selected' : '' %>>Estado</option>
       </select>
     </div>
 
