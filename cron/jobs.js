@@ -82,7 +82,7 @@ module.exports = function(db) {
       JOIN invoices i ON i.service_id = cs.id
       WHERE cs.status = 'active'
         AND i.status = 'pending'
-        AND i.due_date < date('now', '-' || ? || ' days')
+        AND i.due_date <= date('now', '-' || ? || ' days')
     `).all(String(graceDays));
 
     let cutCount = 0;
