@@ -317,12 +317,12 @@ module.exports = function(db) {
       return res.redirect('/clients/' + req.params.id);
     }
     const b = req.body;
-    db.prepare(`INSERT INTO client_services (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO client_services (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, onu_serial, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       req.params.id, b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
       b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
       b.mac_address || null, b.router_name || null, b.installation_date || null,
-      b.billing_day || 1, 'active'
+      b.billing_day || 1, b.onu_serial || null, 'active'
     );
     req.session.success = 'Servicio agregado exitosamente';
     res.redirect('/clients/' + req.params.id);
@@ -335,11 +335,11 @@ module.exports = function(db) {
       return res.redirect('/clients/' + req.params.id);
     }
     const b = req.body;
-    db.prepare(`UPDATE client_services SET label=?, plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?, installation_date=?, billing_day=? WHERE id=? AND client_id=?`).run(
+    db.prepare(`UPDATE client_services SET label=?, plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?, installation_date=?, billing_day=?, onu_serial=? WHERE id=? AND client_id=?`).run(
       b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
       b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
       b.mac_address || null, b.router_name || null, b.installation_date || null,
-      b.billing_day || 1, req.params.serviceId, req.params.id
+      b.billing_day || 1, b.onu_serial || null, req.params.serviceId, req.params.id
     );
     req.session.success = 'Servicio actualizado';
     res.redirect('/clients/' + req.params.id);

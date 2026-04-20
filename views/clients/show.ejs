@@ -200,8 +200,18 @@
               <% if (svc.pppoe_user && svc.connection_type === 'pppoe') { %>
                 <span class="font-mono"><i class="fas fa-user-cog mr-1"></i><%= svc.pppoe_user %></span>
               <% } %>
+              <% if (svc.onu_serial) { %>
+                <span class="font-mono text-purple-600"><i class="fas fa-microchip mr-1"></i><%= svc.onu_serial %></span>
+              <% } %>
               <span><i class="fas fa-calendar-day mr-1"></i>Cobro: dia <%= svc.billing_day || 1 %></span>
             </div>
+            <% if (svc.onu_serial) { %>
+            <div class="mt-2 pt-2 border-t border-gray-100">
+              <div class="onu-info-<%= svc.id %> text-xs text-gray-400">
+                <i class="fas fa-spinner fa-spin mr-1"></i> Cargando info ONU...
+              </div>
+            </div>
+            <% } %>
           </div>
           <% if (user.role === 'admin') { %>
           <div class="flex items-center gap-1 shrink-0">
@@ -314,6 +324,12 @@
         </div>
       </div>
       <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Serial ONU (TR-069)</label>
+        <input type="text" name="onu_serial" id="svc-onuserial" placeholder="Ej: ECOM12345678"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none font-mono uppercase">
+        <p class="text-xs text-gray-400 mt-1">Numero de serie de la ONU para gestion remota via GenieACS</p>
+      </div>
+      <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Instalacion</label>
         <input type="date" name="installation_date" id="svc-instdate"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
@@ -327,7 +343,7 @@
 </div>
 
 <script>
-var _services = <%- JSON.stringify(services.map(s => ({id:s.id, label:s.label, plan_id:s.plan_id, connection_type:s.connection_type, billing_day:s.billing_day, ip_address:s.ip_address, pppoe_user:s.pppoe_user, pppoe_password:s.pppoe_password, mac_address:s.mac_address, router_name:s.router_name, installation_date:s.installation_date}))) %>;
+var _services = <%- JSON.stringify(services.map(s => ({id:s.id, label:s.label, plan_id:s.plan_id, connection_type:s.connection_type, billing_day:s.billing_day, ip_address:s.ip_address, pppoe_user:s.pppoe_user, pppoe_password:s.pppoe_password, mac_address:s.mac_address, router_name:s.router_name, installation_date:s.installation_date, onu_serial:s.onu_serial}))) %>;
 function editService(id) {
   var svc = _services.find(function(s) { return s.id === id; });
   if (!svc) return;
@@ -343,6 +359,7 @@ function editService(id) {
   document.getElementById('svc-mac').value = svc.mac_address || '';
   document.getElementById('svc-router').value = svc.router_name || '';
   document.getElementById('svc-instdate').value = svc.installation_date || '';
+  document.getElementById('svc-onuserial').value = svc.onu_serial || '';
   toggleSvcPPPoE();
   document.getElementById('add-service-modal').classList.remove('hidden');
 }
@@ -358,6 +375,251 @@ function toggleSvcPPPoE() {
   document.getElementById('svc-pppoe-fields').style.display = t === 'pppoe' ? '' : 'none';
 }
 </script>
+
+<!-- ONU Management (TR-069) -->
+<% const onuServices = services.filter(s => s.onu_serial); %>
+<% if (onuServices.length > 0) { %>
+<div class="bg-white rounded-xl shadow-sm border mb-6">
+  <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
+    <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+      <i class="fas fa-microchip text-purple-600"></i> Gestion ONU (TR-069)
+    </h3>
+  </div>
+  <div class="divide-y">
+    <% onuServices.forEach(svc => { %>
+    <div class="p-5" id="onu-panel-<%= svc.id %>">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="font-medium text-sm text-gray-800"><%= svc.onu_serial %></span>
+          <% if (svc.label) { %>
+            <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full"><%= svc.label %></span>
+          <% } %>
+          <span id="onu-status-<%= svc.id %>" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Verificando...</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="refreshOnu('<%= svc.onu_serial %>', <%= svc.id %>)" class="text-xs text-gray-500 hover:text-wisp-600" title="Actualizar">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+        </div>
+      </div>
+      <div id="onu-details-<%= svc.id %>" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">WiFi SSID</p>
+          <p id="onu-ssid-<%= svc.id %>" class="font-mono text-gray-700">-</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">Contrasena WiFi</p>
+          <p id="onu-wifipass-<%= svc.id %>" class="font-mono text-gray-700">-</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">IP WAN</p>
+          <p id="onu-ip-<%= svc.id %>" class="font-mono text-gray-700">-</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">MAC</p>
+          <p id="onu-mac-<%= svc.id %>" class="font-mono text-gray-700">-</p>
+        </div>
+      </div>
+      <div id="onu-extra-<%= svc.id %>" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">Firmware</p>
+          <p id="onu-fw-<%= svc.id %>" class="font-mono text-gray-700 text-xs">-</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-1">Dispositivos Conectados</p>
+          <div id="onu-hosts-<%= svc.id %>" class="text-xs text-gray-600">-</div>
+        </div>
+      </div>
+      <!-- ONU Actions -->
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button onclick="showWifiModal('<%= svc.onu_serial %>', <%= svc.id %>)" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+          <i class="fas fa-wifi mr-1"></i> Cambiar WiFi
+        </button>
+        <button onclick="rebootOnu('<%= svc.onu_serial %>', <%= svc.id %>)" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+          <i class="fas fa-power-off mr-1"></i> Reiniciar ONU
+        </button>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+</div>
+
+<!-- WiFi Change Modal -->
+<div id="wifi-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.5)">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
+      <h3 class="font-semibold text-gray-700"><i class="fas fa-wifi text-purple-600 mr-2"></i>Cambiar WiFi</h3>
+      <button onclick="document.getElementById('wifi-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="wifi-serial">
+      <input type="hidden" id="wifi-svcid">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nuevo SSID (nombre de red)</label>
+        <input type="text" id="wifi-ssid" placeholder="Nombre de la red WiFi"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nueva Contrasena WiFi</label>
+        <input type="text" id="wifi-password" placeholder="Contrasena WiFi (min 8 caracteres)"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none">
+      </div>
+      <p class="text-xs text-gray-400">Deja en blanco el campo que no quieras cambiar</p>
+      <div class="flex justify-end gap-3">
+        <button onclick="document.getElementById('wifi-modal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm">Cancelar</button>
+        <button onclick="changeWifi()" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg text-sm font-medium">
+          <i class="fas fa-save mr-1"></i> Aplicar Cambios
+        </button>
+      </div>
+      <div id="wifi-result" class="hidden text-sm p-3 rounded-lg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ONU TR-069 functions
+function refreshOnu(serial, svcId) {
+  var statusEl = document.getElementById('onu-status-' + svcId);
+  statusEl.textContent = 'Cargando...';
+  statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500';
+
+  fetch('/onu/api/device/' + encodeURIComponent(serial))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        statusEl.textContent = 'No encontrada';
+        statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+        // Also update the inline info
+        var inlineEl = document.querySelector('.onu-info-' + svcId);
+        if (inlineEl) inlineEl.innerHTML = '<span class="text-red-400"><i class="fas fa-times-circle mr-1"></i>ONU no detectada en GenieACS</span>';
+        return;
+      }
+      if (data.online) {
+        statusEl.textContent = 'En linea';
+        statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700';
+      } else {
+        statusEl.textContent = 'Desconectada';
+        statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+      }
+      document.getElementById('onu-ssid-' + svcId).textContent = data.ssid || '-';
+      document.getElementById('onu-wifipass-' + svcId).textContent = data.wifiPassword || '-';
+      document.getElementById('onu-ip-' + svcId).textContent = data.ip || '-';
+      document.getElementById('onu-mac-' + svcId).textContent = data.mac || '-';
+      document.getElementById('onu-fw-' + svcId).textContent = (data.softwareVersion || '-') + ' / ' + (data.hardwareVersion || '-');
+
+      // Hosts
+      var hostsEl = document.getElementById('onu-hosts-' + svcId);
+      if (data.hosts && data.hosts.length > 0) {
+        var html = '<div class="space-y-1">';
+        data.hosts.forEach(function(h) {
+          html += '<div class="flex items-center gap-2"><i class="fas fa-laptop text-gray-400"></i> ' + (h.name || 'Sin nombre') + ' <span class="text-gray-400">(' + (h.ip || '') + ')</span></div>';
+        });
+        html += '</div>';
+        hostsEl.innerHTML = html;
+      } else {
+        hostsEl.textContent = 'Sin dispositivos';
+      }
+
+      // Update inline info
+      var inlineEl = document.querySelector('.onu-info-' + svcId);
+      if (inlineEl) {
+        var statusText = data.online ? '<span class="text-green-600"><i class="fas fa-circle text-xs mr-1"></i>En linea</span>' : '<span class="text-red-500"><i class="fas fa-circle text-xs mr-1"></i>Desconectada</span>';
+        inlineEl.innerHTML = statusText + (data.ssid ? ' &middot; <span class="text-gray-500">' + data.ssid + '</span>' : '') + (data.hosts ? ' &middot; <span class="text-gray-400">' + data.hosts.length + ' dispositivos</span>' : '');
+      }
+    })
+    .catch(function() {
+      statusEl.textContent = 'Error';
+      statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+    });
+}
+
+function showWifiModal(serial, svcId) {
+  document.getElementById('wifi-serial').value = serial;
+  document.getElementById('wifi-svcid').value = svcId;
+  document.getElementById('wifi-ssid').value = document.getElementById('onu-ssid-' + svcId).textContent;
+  if (document.getElementById('wifi-ssid').value === '-') document.getElementById('wifi-ssid').value = '';
+  document.getElementById('wifi-password').value = '';
+  document.getElementById('wifi-result').classList.add('hidden');
+  document.getElementById('wifi-modal').classList.remove('hidden');
+}
+
+function changeWifi() {
+  var serial = document.getElementById('wifi-serial').value;
+  var ssid = document.getElementById('wifi-ssid').value.trim();
+  var password = document.getElementById('wifi-password').value.trim();
+  var resultEl = document.getElementById('wifi-result');
+
+  if (!ssid && !password) {
+    resultEl.textContent = 'Debe especificar al menos un campo';
+    resultEl.className = 'text-sm p-3 rounded-lg bg-red-50 text-red-600';
+    resultEl.classList.remove('hidden');
+    return;
+  }
+
+  resultEl.textContent = 'Enviando cambios...';
+  resultEl.className = 'text-sm p-3 rounded-lg bg-blue-50 text-blue-600';
+  resultEl.classList.remove('hidden');
+
+  fetch('/onu/api/device/' + encodeURIComponent(serial) + '/wifi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ssid: ssid || undefined, password: password || undefined })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      resultEl.textContent = 'Error: ' + data.error;
+      resultEl.className = 'text-sm p-3 rounded-lg bg-red-50 text-red-600';
+    } else {
+      resultEl.textContent = 'WiFi actualizado correctamente. Los cambios pueden tardar unos segundos en aplicarse.';
+      resultEl.className = 'text-sm p-3 rounded-lg bg-green-50 text-green-600';
+      var svcId = document.getElementById('wifi-svcid').value;
+      setTimeout(function() { refreshOnu(serial, svcId); }, 5000);
+    }
+  })
+  .catch(function() {
+    resultEl.textContent = 'Error de conexion';
+    resultEl.className = 'text-sm p-3 rounded-lg bg-red-50 text-red-600';
+  });
+}
+
+function rebootOnu(serial, svcId) {
+  if (!confirm('Reiniciar la ONU ' + serial + '? El cliente perdera conexion por unos minutos.')) return;
+
+  var statusEl = document.getElementById('onu-status-' + svcId);
+  statusEl.textContent = 'Reiniciando...';
+  statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700';
+
+  fetch('/onu/api/device/' + encodeURIComponent(serial) + '/reboot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      alert('Error: ' + data.error);
+      statusEl.textContent = 'Error';
+      statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+    } else {
+      statusEl.textContent = 'Reiniciando...';
+      statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700';
+      setTimeout(function() { refreshOnu(serial, svcId); }, 30000);
+    }
+  })
+  .catch(function() {
+    statusEl.textContent = 'Error';
+    statusEl.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+  });
+}
+
+// Auto-load ONU info on page load
+document.addEventListener('DOMContentLoaded', function() {
+  <% onuServices.forEach(function(svc) { %>
+  refreshOnu('<%= svc.onu_serial %>', <%= svc.id %>);
+  <% }) %>
+});
+</script>
+<% } %>
 
 <!-- Location Map -->
 <% if (client.latitude && client.longitude) { %>

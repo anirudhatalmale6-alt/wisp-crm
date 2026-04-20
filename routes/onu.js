@@ -1,5 +1,6 @@
 const express = require('express');
 const { Client } = require('ssh2');
+const axios = require('axios');
 
 module.exports = function(db) {
   const router = express.Router();
@@ -9,6 +10,130 @@ module.exports = function(db) {
     db.prepare('SELECT key, value FROM settings').all().forEach(r => s[r.key] = r.value);
     return s;
   };
+
+  // ========== GenieACS TR-069 Integration ==========
+
+  const getNbiUrl = () => {
+    const settings = getSettings();
+    return settings.genieacs_url || 'http://localhost:7557';
+  };
+
+  // API: Get all devices from GenieACS
+  router.get('/api/devices', async (req, res) => {
+    try {
+      const resp = await axios.get(`${getNbiUrl()}/devices`, { timeout: 5000 });
+      res.json(resp.data);
+    } catch (e) {
+      res.json({ error: e.message });
+    }
+  });
+
+  // API: Get device by serial number
+  router.get('/api/device/:serial', async (req, res) => {
+    try {
+      const filter = encodeURIComponent(JSON.stringify({ "_id": { "$regex": req.params.serial } }));
+      const resp = await axios.get(`${getNbiUrl()}/devices?query=${filter}`, { timeout: 5000 });
+      if (resp.data && resp.data.length > 0) {
+        const device = resp.data[0];
+        const info = {
+          id: device._id,
+          online: device._lastInform ? (Date.now() - new Date(device._lastInform).getTime()) < 300000 : false,
+          lastInform: device._lastInform,
+          manufacturer: device._deviceId ? device._deviceId._Manufacturer : '',
+          productClass: device._deviceId ? device._deviceId._ProductClass : '',
+          serialNumber: device._deviceId ? device._deviceId._SerialNumber : '',
+          ssid: '',
+          wifiPassword: '',
+          ip: '',
+          mac: '',
+          softwareVersion: '',
+          hardwareVersion: '',
+          hosts: []
+        };
+        // Extract parameters
+        const p = device;
+        const igd = 'InternetGatewayDevice';
+        if (p[igd]) {
+          if (p[igd].LANDevice && p[igd].LANDevice['1'] && p[igd].LANDevice['1'].WLANConfiguration && p[igd].LANDevice['1'].WLANConfiguration['1']) {
+            const wlan = p[igd].LANDevice['1'].WLANConfiguration['1'];
+            info.ssid = wlan.SSID ? wlan.SSID._value : '';
+            info.wifiPassword = wlan.KeyPassphrase ? wlan.KeyPassphrase._value : (wlan.PreSharedKey ? wlan.PreSharedKey['1'] ? wlan.PreSharedKey['1'].PreSharedKey ? wlan.PreSharedKey['1'].PreSharedKey._value : '' : '' : '');
+          }
+          if (p[igd].WANDevice && p[igd].WANDevice['1'] && p[igd].WANDevice['1'].WANConnectionDevice && p[igd].WANDevice['1'].WANConnectionDevice['1'] && p[igd].WANDevice['1'].WANConnectionDevice['1'].WANIPConnection && p[igd].WANDevice['1'].WANConnectionDevice['1'].WANIPConnection['1']) {
+            const wan = p[igd].WANDevice['1'].WANConnectionDevice['1'].WANIPConnection['1'];
+            info.ip = wan.ExternalIPAddress ? wan.ExternalIPAddress._value : '';
+            info.mac = wan.MACAddress ? wan.MACAddress._value : '';
+          }
+          if (p[igd].DeviceInfo) {
+            info.softwareVersion = p[igd].DeviceInfo.SoftwareVersion ? p[igd].DeviceInfo.SoftwareVersion._value : '';
+            info.hardwareVersion = p[igd].DeviceInfo.HardwareVersion ? p[igd].DeviceInfo.HardwareVersion._value : '';
+          }
+          // Get LAN hosts
+          if (p[igd].LANDevice && p[igd].LANDevice['1'] && p[igd].LANDevice['1'].Hosts && p[igd].LANDevice['1'].Hosts.Host) {
+            const hosts = p[igd].LANDevice['1'].Hosts.Host;
+            Object.keys(hosts).forEach(k => {
+              if (hosts[k] && hosts[k].HostName) {
+                info.hosts.push({
+                  name: hosts[k].HostName._value || '',
+                  ip: hosts[k].IPAddress ? hosts[k].IPAddress._value : '',
+                  mac: hosts[k].MACAddress ? hosts[k].MACAddress._value : ''
+                });
+              }
+            });
+          }
+        }
+        res.json(info);
+      } else {
+        res.json({ error: 'ONU no encontrada en GenieACS' });
+      }
+    } catch (e) {
+      res.json({ error: e.message });
+    }
+  });
+
+  // API: Change WiFi SSID and/or password
+  router.post('/api/device/:serial/wifi', async (req, res) => {
+    try {
+      const { ssid, password } = req.body;
+      const filter = encodeURIComponent(JSON.stringify({ "_id": { "$regex": req.params.serial } }));
+      const resp = await axios.get(`${getNbiUrl()}/devices?query=${filter}`, { timeout: 5000 });
+      if (!resp.data || resp.data.length === 0) return res.json({ error: 'ONU no encontrada' });
+
+      const deviceId = encodeURIComponent(resp.data[0]._id);
+      const paramValues = [];
+      if (ssid) paramValues.push(["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID", ssid, "xsd:string"]);
+      if (password) paramValues.push(["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase", password, "xsd:string"]);
+
+      if (paramValues.length === 0) return res.json({ error: 'Debe especificar SSID o contrasena' });
+
+      await axios.post(`${getNbiUrl()}/devices/${deviceId}/tasks?connection_request`, {
+        name: "setParameterValues",
+        parameterValues: paramValues
+      }, { timeout: 10000 });
+
+      res.json({ success: true, message: 'WiFi actualizado. El cambio puede tardar unos segundos.' });
+    } catch (e) {
+      res.json({ error: e.message });
+    }
+  });
+
+  // API: Reboot ONU
+  router.post('/api/device/:serial/reboot', async (req, res) => {
+    try {
+      const filter = encodeURIComponent(JSON.stringify({ "_id": { "$regex": req.params.serial } }));
+      const resp = await axios.get(`${getNbiUrl()}/devices?query=${filter}`, { timeout: 5000 });
+      if (!resp.data || resp.data.length === 0) return res.json({ error: 'ONU no encontrada' });
+
+      const deviceId = encodeURIComponent(resp.data[0]._id);
+      await axios.post(`${getNbiUrl()}/devices/${deviceId}/tasks?connection_request`, {
+        name: "reboot"
+      }, { timeout: 10000 });
+
+      res.json({ success: true, message: 'Comando de reinicio enviado' });
+    } catch (e) {
+      res.json({ error: e.message });
+    }
+  });
 
   // Execute command on OLT via SSH
   function execOltCommand(settings, command, timeout = 15000) {

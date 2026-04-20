@@ -84,6 +84,17 @@ module.exports = function(db) {
   // Add user_id to payments (track who registered each payment)
   try { db.exec('ALTER TABLE payments ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch(e) {}
 
+  // Add ONU serial number to client_services (for GenieACS TR-069 integration)
+  try { db.exec('ALTER TABLE client_services ADD COLUMN onu_serial TEXT'); } catch(e) {}
+
+  // Add GenieACS settings defaults
+  const genieDefaults = [
+    ['genieacs_url', 'http://localhost:7557', 'URL del API de GenieACS (NBI)']
+  ];
+  genieDefaults.forEach(([key, value, description]) => {
+    try { db.prepare('INSERT OR IGNORE INTO settings (key, value, description) VALUES (?, ?, ?)').run(key, value, description); } catch(e) {}
+  });
+
   // Add service_id to mikrotik_queue
   try { db.exec('ALTER TABLE mikrotik_queue ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
 
