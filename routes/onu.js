@@ -1,6 +1,7 @@
 const express = require('express');
 const { Client } = require('ssh2');
 const axios = require('axios');
+const snmp = require('net-snmp');
 
 module.exports = function(db) {
   const router = express.Router();
@@ -10,6 +11,223 @@ module.exports = function(db) {
     db.prepare('SELECT key, value FROM settings').all().forEach(r => s[r.key] = r.value);
     return s;
   };
+
+  // ========== SNMP OLT Integration ==========
+
+  // VSOL/HSGQ GPON OLT OIDs (enterprise 37950)
+  const VSOL_OIDS = {
+    onuSerial:    '1.3.6.1.4.1.37950.1.1.6.1.1.2.1.5',   // ONU serial number table
+    onuRxPower:   '1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7',   // ONU RX optical power
+    onuStatus:    '1.3.6.1.4.1.37950.1.1.5.10.1.2.3.1.2', // PON port status
+    onuCountOnline: '1.3.6.1.4.1.37950.1.1.6.1.1.18.1.3', // ONUs online per PON
+    onuCountTotal:  '1.3.6.1.4.1.37950.1.1.6.1.1.18.1.2', // ONUs provisioned per PON
+    ponSfpTx:     '1.3.6.1.4.1.37950.1.1.5.10.13.1.1.5',  // OLT SFP TX power per PON
+    ponSfpTemp:   '1.3.6.1.4.1.37950.1.1.5.10.13.1.1.2',  // OLT SFP temp per PON
+  };
+
+  // SNMP walk helper
+  function snmpWalk(host, community, oid, timeout) {
+    return new Promise((resolve, reject) => {
+      const session = snmp.createSession(host, community, { timeout: timeout || 10000, retries: 1, version: snmp.Version2c });
+      const results = [];
+
+      session.subtree(oid, 20, (varbinds) => {
+        for (const vb of varbinds) {
+          if (snmp.isVarbindError(vb)) continue;
+          let value = vb.value;
+          if (Buffer.isBuffer(value)) value = value.toString('utf8');
+          results.push({ oid: vb.oid, type: vb.type, value: value });
+        }
+      }, (error) => {
+        session.close();
+        if (error && results.length === 0) reject(error);
+        else resolve(results);
+      });
+    });
+  }
+
+  // SNMP get helper (single OID)
+  function snmpGet(host, community, oids) {
+    return new Promise((resolve, reject) => {
+      const session = snmp.createSession(host, community, { timeout: 10000, retries: 1, version: snmp.Version2c });
+      session.get(oids, (error, varbinds) => {
+        session.close();
+        if (error) return reject(error);
+        resolve(varbinds.map(vb => {
+          let value = vb.value;
+          if (Buffer.isBuffer(value)) value = value.toString('utf8');
+          return { oid: vb.oid, type: vb.type, value: value };
+        }));
+      });
+    });
+  }
+
+  // Parse dBm from VSOL power string like "0.03 mW (-19.25 dBm)"
+  function parseVsolPower(val) {
+    if (!val) return null;
+    const str = String(val);
+    const match = str.match(/\((-?[\d.]+)\s*dBm\)/);
+    if (match) return parseFloat(match[1]);
+    // Try plain number
+    const num = parseFloat(str);
+    if (!isNaN(num)) return num;
+    return null;
+  }
+
+  // API: SNMP - Discover all ONUs from OLT
+  router.get('/api/snmp/discover', async (req, res) => {
+    const settings = getSettings();
+    const oltHost = settings.olt_host;
+    const community = settings.snmp_community || 'public';
+
+    if (!oltHost) return res.json({ error: 'Configure la IP de la OLT en Configuracion' });
+
+    try {
+      // Walk ONU serial numbers
+      let serials = [];
+      try {
+        serials = await snmpWalk(oltHost, community, VSOL_OIDS.onuSerial, 15000);
+      } catch(e) {
+        // Try alternative enterprise OIDs if VSOL doesn't work
+        // C-Data (34592)
+        try {
+          serials = await snmpWalk(oltHost, community, '1.3.6.1.4.1.34592.1.3.4.1.1.3', 15000);
+        } catch(e2) {
+          // NSCRTV (17409)
+          try {
+            serials = await snmpWalk(oltHost, community, '1.3.6.1.4.1.17409.2.8.4.1.1.3', 15000);
+          } catch(e3) {}
+        }
+      }
+
+      // Walk RX power
+      let powers = [];
+      try {
+        powers = await snmpWalk(oltHost, community, VSOL_OIDS.onuRxPower, 15000);
+      } catch(e) {
+        try {
+          powers = await snmpWalk(oltHost, community, '1.3.6.1.4.1.34592.1.3.4.1.1.36', 15000);
+        } catch(e2) {}
+      }
+
+      // Build ONU list
+      const onus = [];
+      const powerMap = {};
+      powers.forEach(p => {
+        // Extract index from OID suffix
+        const parts = p.oid.split('.');
+        const idx = parts.slice(-2).join('.');
+        powerMap[idx] = p.value;
+      });
+
+      serials.forEach((s, i) => {
+        const parts = s.oid.split('.');
+        const idx = parts.slice(-2).join('.');
+        const serial = String(s.value).replace(/\0/g, '').trim();
+
+        // Parse PON port and ONU ID from index
+        const ponPort = parts.length >= 2 ? parts[parts.length - 2] : '';
+        const onuId = parts.length >= 1 ? parts[parts.length - 1] : '';
+
+        const rxRaw = powerMap[idx] || '';
+        const rxDbm = parseVsolPower(rxRaw);
+
+        onus.push({
+          index: idx,
+          ponPort: ponPort,
+          onuId: onuId,
+          serial: serial,
+          rxPower: rxDbm !== null ? rxDbm.toFixed(2) + ' dBm' : (rxRaw ? String(rxRaw) : ''),
+          rxDbm: rxDbm,
+          status: rxDbm !== null ? 'online' : 'unknown'
+        });
+      });
+
+      // Cross-reference with CRM services to show which ONUs are assigned
+      const assignedSerials = {};
+      db.prepare(`SELECT cs.onu_serial, cs.id as service_id, c.id as client_id, c.first_name, c.last_name
+        FROM client_services cs JOIN clients c ON c.id = cs.client_id
+        WHERE cs.onu_serial IS NOT NULL AND cs.onu_serial != ''`).all().forEach(row => {
+        assignedSerials[row.onu_serial.toUpperCase()] = {
+          serviceId: row.service_id,
+          clientId: row.client_id,
+          clientName: row.first_name + ' ' + row.last_name
+        };
+      });
+
+      onus.forEach(onu => {
+        const assigned = assignedSerials[onu.serial.toUpperCase()];
+        if (assigned) {
+          onu.assigned = true;
+          onu.clientId = assigned.clientId;
+          onu.clientName = assigned.clientName;
+        } else {
+          onu.assigned = false;
+        }
+      });
+
+      res.json({ onus, total: onus.length, error: null });
+    } catch (e) {
+      res.json({ onus: [], total: 0, error: 'Error SNMP: ' + e.message });
+    }
+  });
+
+  // API: SNMP - Test connection to OLT
+  router.get('/api/snmp/test', async (req, res) => {
+    const settings = getSettings();
+    const oltHost = settings.olt_host;
+    const community = settings.snmp_community || 'public';
+
+    if (!oltHost) return res.json({ success: false, error: 'Configure la IP de la OLT' });
+
+    try {
+      // Try to get sysDescr (standard OID)
+      const result = await snmpGet(oltHost, community, ['1.3.6.1.2.1.1.1.0']);
+      const desc = result[0] ? String(result[0].value) : 'Desconocido';
+
+      // Try to get sysName
+      let name = '';
+      try {
+        const nameResult = await snmpGet(oltHost, community, ['1.3.6.1.2.1.1.5.0']);
+        name = nameResult[0] ? String(nameResult[0].value) : '';
+      } catch(e) {}
+
+      // Try walking VSOL enterprise tree to check if OIDs work
+      let vsolWorks = false;
+      try {
+        const test = await snmpWalk(oltHost, community, '1.3.6.1.4.1.37950.1.1.6.1.1.18', 8000);
+        vsolWorks = test.length > 0;
+      } catch(e) {}
+
+      res.json({
+        success: true,
+        description: desc,
+        name: name,
+        vsolOids: vsolWorks,
+        message: vsolWorks ? 'OLT conectada - OIDs VSOL/HSGQ detectados' : 'OLT conectada - probando OIDs alternativos...'
+      });
+    } catch (e) {
+      res.json({ success: false, error: 'No se pudo conectar: ' + e.message });
+    }
+  });
+
+  // API: SNMP - Walk arbitrary OID (for debugging/discovery)
+  router.get('/api/snmp/walk', async (req, res) => {
+    const settings = getSettings();
+    const oltHost = settings.olt_host;
+    const community = settings.snmp_community || 'public';
+    const oid = req.query.oid;
+
+    if (!oltHost) return res.json({ error: 'Configure la IP de la OLT' });
+    if (!oid) return res.json({ error: 'OID requerido' });
+
+    try {
+      const results = await snmpWalk(oltHost, community, oid, 15000);
+      res.json({ results, count: results.length });
+    } catch (e) {
+      res.json({ error: e.message, results: [], count: 0 });
+    }
+  });
 
   // ========== GenieACS TR-069 Integration ==========
 

@@ -89,7 +89,8 @@ module.exports = function(db) {
 
   // Add GenieACS settings defaults
   const genieDefaults = [
-    ['genieacs_url', 'http://localhost:7557', 'URL del API de GenieACS (NBI)']
+    ['genieacs_url', 'http://localhost:7557', 'URL del API de GenieACS (NBI)'],
+    ['snmp_community', 'public', 'Community SNMP para lectura de la OLT']
   ];
   genieDefaults.forEach(([key, value, description]) => {
     try { db.prepare('INSERT OR IGNORE INTO settings (key, value, description) VALUES (?, ?, ?)').run(key, value, description); } catch(e) {}
