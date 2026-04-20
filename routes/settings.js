@@ -16,12 +16,17 @@ module.exports = function(db) {
   // Update general settings
   router.post('/general', (req, res) => {
     const fields = ['company_name', 'company_phone', 'currency', 'tax_rate', 'grace_days',
-      'auto_cut_enabled', 'payment_reminder_days'];
+      'payment_reminder_days'];
+    const checkboxFields = ['auto_cut_enabled'];
     const update = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
     for (const key of fields) {
       if (req.body[key] !== undefined) {
         update.run(req.body[key], key);
       }
+    }
+    // Checkboxes: if not in body, value is '0'; if in body, value is '1'
+    for (const key of checkboxFields) {
+      update.run(req.body[key] ? '1' : '0', key);
     }
     req.session.success = 'Configuración general actualizada';
     res.redirect('/settings');

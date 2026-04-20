@@ -224,6 +224,14 @@ module.exports = function(db) {
       return res.redirect('/clients');
     }
     const b = req.body;
+    // Check for duplicate PPPoE username
+    if (b.pppoe_user && b.connection_type === 'pppoe') {
+      const existing = db.prepare('SELECT cs.id, c.first_name, c.last_name FROM client_services cs JOIN clients c ON c.id = cs.client_id WHERE cs.pppoe_user = ? COLLATE NOCASE').get(b.pppoe_user);
+      if (existing) {
+        req.session.error = `El usuario PPPoE "${b.pppoe_user}" ya esta asignado a ${existing.first_name} ${existing.last_name}`;
+        return res.redirect('/clients/new');
+      }
+    }
     db.prepare(`INSERT INTO clients (first_name, last_name, phone, phone2, email, cedula, address, city, neighborhood,
       plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name,
       installation_date, billing_day, status, latitude, longitude, google_maps_link, notes)
@@ -317,6 +325,14 @@ module.exports = function(db) {
       return res.redirect('/clients/' + req.params.id);
     }
     const b = req.body;
+    // Check for duplicate PPPoE username
+    if (b.pppoe_user && b.connection_type === 'pppoe') {
+      const existing = db.prepare('SELECT cs.id, c.first_name, c.last_name FROM client_services cs JOIN clients c ON c.id = cs.client_id WHERE cs.pppoe_user = ? COLLATE NOCASE').get(b.pppoe_user);
+      if (existing) {
+        req.session.error = `El usuario PPPoE "${b.pppoe_user}" ya esta asignado a ${existing.first_name} ${existing.last_name}`;
+        return res.redirect('/clients/' + req.params.id);
+      }
+    }
     db.prepare(`INSERT INTO client_services (client_id, label, plan_id, connection_type, pppoe_user, pppoe_password, ip_address, mac_address, router_name, installation_date, billing_day, onu_serial, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       req.params.id, b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
@@ -335,6 +351,14 @@ module.exports = function(db) {
       return res.redirect('/clients/' + req.params.id);
     }
     const b = req.body;
+    // Check for duplicate PPPoE username (exclude current service)
+    if (b.pppoe_user && b.connection_type === 'pppoe') {
+      const existing = db.prepare('SELECT cs.id, c.first_name, c.last_name FROM client_services cs JOIN clients c ON c.id = cs.client_id WHERE cs.pppoe_user = ? COLLATE NOCASE AND cs.id != ?').get(b.pppoe_user, req.params.serviceId);
+      if (existing) {
+        req.session.error = `El usuario PPPoE "${b.pppoe_user}" ya esta asignado a ${existing.first_name} ${existing.last_name}`;
+        return res.redirect('/clients/' + req.params.id);
+      }
+    }
     db.prepare(`UPDATE client_services SET label=?, plan_id=?, connection_type=?, pppoe_user=?, pppoe_password=?, ip_address=?, mac_address=?, router_name=?, installation_date=?, billing_day=?, onu_serial=? WHERE id=? AND client_id=?`).run(
       b.label || '', b.plan_id || null, b.connection_type || 'pppoe',
       b.pppoe_user || null, b.pppoe_password || null, b.ip_address || null,
