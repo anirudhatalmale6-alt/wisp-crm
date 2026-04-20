@@ -14,15 +14,26 @@ module.exports = function(db) {
 
   // ========== SNMP OLT Integration ==========
 
-  // VSOL/HSGQ GPON OLT OIDs (enterprise 37950)
-  const VSOL_OIDS = {
-    onuSerial:    '1.3.6.1.4.1.37950.1.1.6.1.1.2.1.5',   // ONU serial number table
-    onuRxPower:   '1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7',   // ONU RX optical power
-    onuStatus:    '1.3.6.1.4.1.37950.1.1.5.10.1.2.3.1.2', // PON port status
-    onuCountOnline: '1.3.6.1.4.1.37950.1.1.6.1.1.18.1.3', // ONUs online per PON
-    onuCountTotal:  '1.3.6.1.4.1.37950.1.1.6.1.1.18.1.2', // ONUs provisioned per PON
-    ponSfpTx:     '1.3.6.1.4.1.37950.1.1.5.10.13.1.1.5',  // OLT SFP TX power per PON
-    ponSfpTemp:   '1.3.6.1.4.1.37950.1.1.5.10.13.1.1.2',  // OLT SFP temp per PON
+  // HSGQ GPON OLT OIDs (enterprise 50224)
+  const HSGQ_OIDS = {
+    // ONU table: 1.3.6.1.4.1.50224.3.12.2.1.{column}.{index}
+    onuId:        '1.3.6.1.4.1.50224.3.12.2.1.2',   // ONU ID: "ONT01/000"
+    onuStatus:    '1.3.6.1.4.1.50224.3.12.2.1.4',   // Status: 1=online, 2=offline
+    onuVendor:    '1.3.6.1.4.1.50224.3.12.2.1.8',   // Vendor: "HWTC", "ECOM"
+    onuModel:     '1.3.6.1.4.1.50224.3.12.2.1.9',   // Model: "HG8546M"
+    onuHwVer:     '1.3.6.1.4.1.50224.3.12.2.1.10',  // HW version
+    onuSwVer:     '1.3.6.1.4.1.50224.3.12.2.1.13',  // SW version / firmware
+    onuSerial:    '1.3.6.1.4.1.50224.3.12.2.1.15',  // Serial: "HWTC1f9ac49c"
+    onuDesc:      '1.3.6.1.4.1.50224.3.12.2.1.16',  // Description (usually empty)
+    onuLastSeen:  '1.3.6.1.4.1.50224.3.12.2.1.20',  // Last registration: "2026/04/20 02:59:10"
+    onuUptime:    '1.3.6.1.4.1.50224.3.12.2.1.21',  // Uptime timeticks
+    // PON port summary: 1.3.6.1.4.1.50224.3.2.3.1.{column}.{portIndex}
+    ponOnuTotal:  '1.3.6.1.4.1.50224.3.2.3.1.3',    // Total ONUs per PON
+    ponOnuOnline: '1.3.6.1.4.1.50224.3.2.3.1.4',    // Online ONUs per PON
+    ponOnuOffline:'1.3.6.1.4.1.50224.3.2.3.1.5',    // Offline ONUs per PON
+    // Optical power (may be in 3.12.3)
+    onuRxPower:   '1.3.6.1.4.1.50224.3.12.3.1.4',   // RX power (to verify)
+    onuTxPower:   '1.3.6.1.4.1.50224.3.12.3.1.5',   // TX power (to verify)
   };
 
   // SNMP walk helper
@@ -62,16 +73,21 @@ module.exports = function(db) {
     });
   }
 
-  // Parse dBm from VSOL power string like "0.03 mW (-19.25 dBm)"
-  function parseVsolPower(val) {
-    if (!val) return null;
-    const str = String(val);
-    const match = str.match(/\((-?[\d.]+)\s*dBm\)/);
-    if (match) return parseFloat(match[1]);
-    // Try plain number
-    const num = parseFloat(str);
-    if (!isNaN(num)) return num;
-    return null;
+  // Helper: build a map from SNMP walk results keyed by the last OID index
+  function buildMap(results, baseOid) {
+    const map = {};
+    const baseLen = baseOid.split('.').length;
+    for (const r of results) {
+      const parts = r.oid.split('.');
+      // ONU table has single index after base, power table has 3-part index
+      const idx = parts[baseLen]; // main ONU index
+      if (idx) {
+        let val = r.value;
+        if (Buffer.isBuffer(val)) val = val.toString('utf8');
+        map[idx] = String(val).replace(/\0/g, '').trim();
+      }
+    }
+    return map;
   }
 
   // API: SNMP - Discover all ONUs from OLT
@@ -83,65 +99,91 @@ module.exports = function(db) {
     if (!oltHost) return res.json({ error: 'Configure la IP de la OLT en Configuracion' });
 
     try {
-      // Walk ONU serial numbers
-      let serials = [];
-      try {
-        serials = await snmpWalk(oltHost, community, VSOL_OIDS.onuSerial, 15000);
-      } catch(e) {
-        // Try alternative enterprise OIDs if VSOL doesn't work
-        // C-Data (34592)
-        try {
-          serials = await snmpWalk(oltHost, community, '1.3.6.1.4.1.34592.1.3.4.1.1.3', 15000);
-        } catch(e2) {
-          // NSCRTV (17409)
-          try {
-            serials = await snmpWalk(oltHost, community, '1.3.6.1.4.1.17409.2.8.4.1.1.3', 15000);
-          } catch(e3) {}
-        }
+      // Walk all ONU attributes in parallel
+      const [serials, statuses, onuIds, vendors, models, firmwares, lastSeens, rxPowers, txPowers] =
+        await Promise.all([
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuSerial, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuStatus, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuId, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuVendor, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuModel, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuSwVer, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuLastSeen, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuRxPower, 30000).catch(() => []),
+          snmpWalk(oltHost, community, HSGQ_OIDS.onuTxPower, 30000).catch(() => []),
+        ]);
+
+      if (serials.length === 0) {
+        return res.json({ onus: [], total: 0, error: 'No se encontraron ONUs. Verifique la IP de la OLT y la comunidad SNMP.' });
       }
 
-      // Walk RX power
-      let powers = [];
-      try {
-        powers = await snmpWalk(oltHost, community, VSOL_OIDS.onuRxPower, 15000);
-      } catch(e) {
-        try {
-          powers = await snmpWalk(oltHost, community, '1.3.6.1.4.1.34592.1.3.4.1.1.36', 15000);
-        } catch(e2) {}
+      // Build maps keyed by ONU index
+      const statusMap   = buildMap(statuses, HSGQ_OIDS.onuStatus);
+      const idMap       = buildMap(onuIds, HSGQ_OIDS.onuId);
+      const vendorMap   = buildMap(vendors, HSGQ_OIDS.onuVendor);
+      const modelMap    = buildMap(models, HSGQ_OIDS.onuModel);
+      const fwMap       = buildMap(firmwares, HSGQ_OIDS.onuSwVer);
+      const lastSeenMap = buildMap(lastSeens, HSGQ_OIDS.onuLastSeen);
+
+      // Power table has 3-part index: {onuIndex}.{sub1}.{sub2} - extract main index
+      const rxMap = {};
+      const txMap = {};
+      const rxBaseLen = HSGQ_OIDS.onuRxPower.split('.').length;
+      const txBaseLen = HSGQ_OIDS.onuTxPower.split('.').length;
+      for (const r of rxPowers) {
+        const parts = r.oid.split('.');
+        const idx = parts[rxBaseLen];
+        if (idx && !rxMap[idx]) rxMap[idx] = r.value; // take first sub-index
+      }
+      for (const r of txPowers) {
+        const parts = r.oid.split('.');
+        const idx = parts[txBaseLen];
+        if (idx && !txMap[idx]) txMap[idx] = r.value;
       }
 
-      // Build ONU list
+      // Build ONU list from serials
       const onus = [];
-      const powerMap = {};
-      powers.forEach(p => {
-        // Extract index from OID suffix
-        const parts = p.oid.split('.');
-        const idx = parts.slice(-2).join('.');
-        powerMap[idx] = p.value;
-      });
+      const serialBaseLen = HSGQ_OIDS.onuSerial.split('.').length;
 
-      serials.forEach((s, i) => {
+      for (const s of serials) {
         const parts = s.oid.split('.');
-        const idx = parts.slice(-2).join('.');
+        const idx = parts[serialBaseLen];
+        if (!idx) continue;
+
         const serial = String(s.value).replace(/\0/g, '').trim();
+        if (!serial) continue;
 
-        // Parse PON port and ONU ID from index
-        const ponPort = parts.length >= 2 ? parts[parts.length - 2] : '';
-        const onuId = parts.length >= 1 ? parts[parts.length - 1] : '';
+        const onuIdStr = idMap[idx] || '';
+        // Parse PON port from ONU ID like "ONT01/000" → PON 1
+        const ponMatch = onuIdStr.match(/ONT(\d+)/);
+        const ponPort = ponMatch ? parseInt(ponMatch[1]) : '';
 
-        const rxRaw = powerMap[idx] || '';
-        const rxDbm = parseVsolPower(rxRaw);
+        // Status: 1=online, 2=offline
+        const statusVal = parseInt(statusMap[idx]) || 0;
+        const status = statusVal === 1 ? 'online' : statusVal === 2 ? 'offline' : 'unknown';
+
+        // Optical power: values are in hundredths of dBm (e.g., -2481 = -24.81 dBm)
+        const rxRaw = parseInt(rxMap[idx]);
+        const txRaw = parseInt(txMap[idx]);
+        const rxDbm = !isNaN(rxRaw) ? (rxRaw / 100) : null;
+        const txDbm = !isNaN(txRaw) ? (txRaw / 100) : null;
 
         onus.push({
           index: idx,
           ponPort: ponPort,
-          onuId: onuId,
+          onuId: onuIdStr,
           serial: serial,
-          rxPower: rxDbm !== null ? rxDbm.toFixed(2) + ' dBm' : (rxRaw ? String(rxRaw) : ''),
+          vendor: vendorMap[idx] || '',
+          model: modelMap[idx] || '',
+          firmware: fwMap[idx] || '',
+          lastSeen: lastSeenMap[idx] || '',
+          status: status,
+          rxPower: rxDbm !== null ? rxDbm.toFixed(2) + ' dBm' : '',
+          txPower: txDbm !== null ? txDbm.toFixed(2) + ' dBm' : '',
           rxDbm: rxDbm,
-          status: rxDbm !== null ? 'online' : 'unknown'
+          txDbm: txDbm,
         });
-      });
+      }
 
       // Cross-reference with CRM services to show which ONUs are assigned
       const assignedSerials = {};
@@ -166,7 +208,14 @@ module.exports = function(db) {
         }
       });
 
-      res.json({ onus, total: onus.length, error: null });
+      // Sort: online first, then by PON port and ONU ID
+      onus.sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'online' ? -1 : 1;
+        if (a.ponPort !== b.ponPort) return (a.ponPort || 0) - (b.ponPort || 0);
+        return (a.onuId || '').localeCompare(b.onuId || '');
+      });
+
+      res.json({ onus, total: onus.length, online: onus.filter(o => o.status === 'online').length, error: null });
     } catch (e) {
       res.json({ onus: [], total: 0, error: 'Error SNMP: ' + e.message });
     }
@@ -192,19 +241,28 @@ module.exports = function(db) {
         name = nameResult[0] ? String(nameResult[0].value) : '';
       } catch(e) {}
 
-      // Try walking VSOL enterprise tree to check if OIDs work
-      let vsolWorks = false;
+      // Try walking HSGQ enterprise tree (50224) to check if ONU OIDs work
+      let hsgqWorks = false;
+      let onuCount = 0;
       try {
-        const test = await snmpWalk(oltHost, community, '1.3.6.1.4.1.37950.1.1.6.1.1.18', 8000);
-        vsolWorks = test.length > 0;
+        const test = await snmpWalk(oltHost, community, HSGQ_OIDS.ponOnuTotal, 8000);
+        hsgqWorks = test.length > 0;
+        // Sum total ONUs across all PON ports
+        for (const t of test) {
+          const v = parseInt(t.value);
+          if (!isNaN(v)) onuCount += v;
+        }
       } catch(e) {}
 
       res.json({
         success: true,
         description: desc,
         name: name,
-        vsolOids: vsolWorks,
-        message: vsolWorks ? 'OLT conectada - OIDs VSOL/HSGQ detectados' : 'OLT conectada - probando OIDs alternativos...'
+        hsgqOids: hsgqWorks,
+        onuCount: onuCount,
+        message: hsgqWorks
+          ? `OLT conectada - HSGQ detectada - ${onuCount} ONUs registradas`
+          : 'OLT conectada - OIDs de ONU no detectados, verifique la configuracion SNMP'
       });
     } catch (e) {
       res.json({ success: false, error: 'No se pudo conectar: ' + e.message });
