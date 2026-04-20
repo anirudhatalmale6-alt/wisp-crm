@@ -68,6 +68,77 @@ module.exports = function(db) {
             info.softwareVersion = p[igd].DeviceInfo.SoftwareVersion ? p[igd].DeviceInfo.SoftwareVersion._value : '';
             info.hardwareVersion = p[igd].DeviceInfo.HardwareVersion ? p[igd].DeviceInfo.HardwareVersion._value : '';
           }
+          // Extract optical power (RX/TX) - try multiple common TR-069 paths
+          info.rxPower = '';
+          info.txPower = '';
+          // Path 1: X_GponInterafceConfig (some vendors)
+          if (p[igd].WANDevice && p[igd].WANDevice['1']) {
+            const wd = p[igd].WANDevice['1'];
+            if (wd.X_GponInterafceConfig) {
+              info.rxPower = wd.X_GponInterafceConfig.RXPower ? wd.X_GponInterafceConfig.RXPower._value : '';
+              info.txPower = wd.X_GponInterafceConfig.TXPower ? wd.X_GponInterafceConfig.TXPower._value : '';
+            }
+            // Path 2: X_GponInterfaceConfig (alternate spelling)
+            if (!info.rxPower && wd.X_GponInterfaceConfig) {
+              info.rxPower = wd.X_GponInterfaceConfig.RXPower ? wd.X_GponInterfaceConfig.RXPower._value : '';
+              info.txPower = wd.X_GponInterfaceConfig.TXPower ? wd.X_GponInterfaceConfig.TXPower._value : '';
+            }
+          }
+          // Path 3: Search all keys for optical/gpon/rx/tx power patterns
+          if (!info.rxPower) {
+            const searchPower = (obj, prefix) => {
+              if (!obj || typeof obj !== 'object') return;
+              for (const key of Object.keys(obj)) {
+                const fullKey = prefix ? prefix + '.' + key : key;
+                if (key.match(/RXPower|RxPower|rxpower|OpticalSignalLevel|RxOpticalPower/i) && obj[key] && obj[key]._value !== undefined) {
+                  info.rxPower = obj[key]._value;
+                }
+                if (key.match(/TXPower|TxPower|txpower|TransmitOpticalLevel|TxOpticalPower/i) && obj[key] && obj[key]._value !== undefined) {
+                  info.txPower = obj[key]._value;
+                }
+                if (typeof obj[key] === 'object' && obj[key] !== null && !obj[key]._value && fullKey.split('.').length < 8) {
+                  searchPower(obj[key], fullKey);
+                }
+              }
+            };
+            searchPower(p[igd], igd);
+          }
+          // Path 4: Check Device.Optical if using Device:2 data model
+          if (!info.rxPower && p['Device']) {
+            const searchPower2 = (obj) => {
+              if (!obj || typeof obj !== 'object') return;
+              for (const key of Object.keys(obj)) {
+                if (key.match(/RXPower|RxPower|OpticalSignalLevel|RxOpticalPower|SignalLevel/i) && obj[key] && obj[key]._value !== undefined) {
+                  info.rxPower = info.rxPower || obj[key]._value;
+                }
+                if (key.match(/TXPower|TxPower|TransmitOpticalLevel|TxOpticalPower/i) && obj[key] && obj[key]._value !== undefined) {
+                  info.txPower = info.txPower || obj[key]._value;
+                }
+                if (typeof obj[key] === 'object' && obj[key] !== null && !obj[key]._value) {
+                  searchPower2(obj[key]);
+                }
+              }
+            };
+            searchPower2(p['Device']);
+          }
+          // Convert to dBm if numeric
+          if (info.rxPower && !isNaN(info.rxPower)) {
+            const rx = parseFloat(info.rxPower);
+            // Some ONUs report in mW (0.0001-5), convert to dBm
+            if (rx > 0 && rx < 10) {
+              info.rxPower = (10 * Math.log10(rx)).toFixed(2) + ' dBm';
+            } else {
+              info.rxPower = rx.toFixed(2) + ' dBm';
+            }
+          }
+          if (info.txPower && !isNaN(info.txPower)) {
+            const tx = parseFloat(info.txPower);
+            if (tx > 0 && tx < 10) {
+              info.txPower = (10 * Math.log10(tx)).toFixed(2) + ' dBm';
+            } else {
+              info.txPower = tx.toFixed(2) + ' dBm';
+            }
+          }
           // Get LAN hosts
           if (p[igd].LANDevice && p[igd].LANDevice['1'] && p[igd].LANDevice['1'].Hosts && p[igd].LANDevice['1'].Hosts.Host) {
             const hosts = p[igd].LANDevice['1'].Hosts.Host;
@@ -112,6 +183,29 @@ module.exports = function(db) {
       }, { timeout: 10000 });
 
       res.json({ success: true, message: 'WiFi actualizado. El cambio puede tardar unos segundos.' });
+    } catch (e) {
+      res.json({ error: e.message });
+    }
+  });
+
+  // API: Refresh all parameter values from ONU (forces GenieACS to re-read)
+  router.post('/api/device/:serial/refresh', async (req, res) => {
+    try {
+      const filter = encodeURIComponent(JSON.stringify({ "_id": { "$regex": req.params.serial } }));
+      const resp = await axios.get(`${getNbiUrl()}/devices?query=${filter}`, { timeout: 5000 });
+      if (!resp.data || resp.data.length === 0) return res.json({ error: 'ONU no encontrada' });
+
+      const deviceId = encodeURIComponent(resp.data[0]._id);
+      await axios.post(`${getNbiUrl()}/devices/${deviceId}/tasks?connection_request`, {
+        name: "getParameterValues",
+        parameterNames: [
+          "InternetGatewayDevice.WANDevice.",
+          "InternetGatewayDevice.LANDevice.",
+          "InternetGatewayDevice.DeviceInfo."
+        ]
+      }, { timeout: 10000 });
+
+      res.json({ success: true, message: 'Solicitud de actualizacion enviada. Espere unos segundos y recargue.' });
     } catch (e) {
       res.json({ error: e.message });
     }
