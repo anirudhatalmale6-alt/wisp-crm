@@ -85,6 +85,7 @@
           <th class="px-3 py-3 font-medium">TX Power</th>
           <th class="px-3 py-3 font-medium">Estado</th>
           <th class="px-3 py-3 font-medium">Cliente</th>
+          <th class="px-3 py-3 font-medium text-center">Acciones</th>
         </tr>
       </thead>
       <tbody id="snmp-tbody">
@@ -184,8 +185,30 @@
   </div>
 </div>
 
+<!-- Assign ONU Modal -->
+<div id="assignModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-700"><i class="fas fa-link text-blue-500 mr-2"></i>Asignar ONU a Cliente</h3>
+      <button onclick="closeAssign()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-5">
+      <p class="text-sm text-gray-600 mb-3">Serial: <span id="assignSerial" class="font-mono font-semibold"></span></p>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Seleccionar servicio del cliente</label>
+      <select id="assignServiceId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">Cargando...</option>
+      </select>
+      <div class="flex justify-end gap-2 mt-4">
+        <button onclick="closeAssign()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+        <button onclick="doAssign()" id="assignBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Asignar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 var allOnus = [];
+var allServices = null;
 
 function setCmd(cmd) {
   document.getElementById('oltCommand').value = cmd;
@@ -316,8 +339,16 @@ function renderOnuTable(onus) {
     if (onu.assigned) {
       html += '<a href="/clients/' + onu.clientId + '" class="text-wisp-600 hover:text-wisp-700 font-medium"><i class="fas fa-user mr-1"></i>' + onu.clientName + '</a>';
     } else {
-      html += '<span class="text-gray-400">Sin asignar</span>';
+      html += '<button onclick="openAssign(\'' + onu.serial + '\')" class="text-blue-500 hover:text-blue-700 text-xs"><i class="fas fa-link mr-1"></i>Asignar</button>';
     }
+    html += '</td>';
+    html += '<td class="px-3 py-2.5 text-center">';
+    html += '<div class="flex items-center justify-center gap-1">';
+    html += '<button onclick="rebootOnu(\'' + onu.index + '\', \'' + onu.serial + '\')" class="text-orange-500 hover:text-orange-700 p-1" title="Reiniciar ONU"><i class="fas fa-sync-alt text-xs"></i></button>';
+    if (onu.assigned) {
+      html += '<button onclick="unassignOnu(\'' + onu.serial + '\')" class="text-red-400 hover:text-red-600 p-1" title="Desasignar"><i class="fas fa-unlink text-xs"></i></button>';
+    }
+    html += '</div>';
     html += '</td>';
     html += '</tr>';
   });
@@ -365,6 +396,90 @@ async function doSnmpWalk() {
   } catch (e) { output.textContent = 'Error: ' + e.message; }
   btn.disabled = false;
   btn.textContent = 'Walk';
+}
+
+async function rebootOnu(index, serial) {
+  if (!confirm('Reiniciar la ONU ' + serial + '?\nLa ONU se desconectara por unos segundos.')) return;
+  try {
+    var resp = await fetch('/onu/api/snmp/reboot/' + index, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    var data = await resp.json();
+    if (data.success) {
+      alert('Comando de reinicio enviado a ' + serial);
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo reiniciar'));
+    }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function openAssign(serial) {
+  document.getElementById('assignSerial').textContent = serial;
+  document.getElementById('assignModal').classList.remove('hidden');
+  var select = document.getElementById('assignServiceId');
+  select.innerHTML = '<option value="">Cargando...</option>';
+
+  if (!allServices) {
+    try {
+      var resp = await fetch('/onu/api/snmp/clients');
+      var data = await resp.json();
+      allServices = data.services || [];
+    } catch (e) {
+      select.innerHTML = '<option value="">Error cargando clientes</option>';
+      return;
+    }
+  }
+
+  var html = '<option value="">-- Seleccionar servicio --</option>';
+  allServices.forEach(function(s) {
+    var label = s.last_name + ' ' + s.first_name + ' - ' + (s.plan_name || 'Sin plan');
+    if (s.pppoe_user) label += ' (' + s.pppoe_user + ')';
+    if (s.onu_serial) label += ' [ONU: ' + s.onu_serial + ']';
+    html += '<option value="' + s.service_id + '">' + label + '</option>';
+  });
+  select.innerHTML = html;
+}
+
+function closeAssign() {
+  document.getElementById('assignModal').classList.add('hidden');
+}
+
+async function doAssign() {
+  var serial = document.getElementById('assignSerial').textContent;
+  var serviceId = document.getElementById('assignServiceId').value;
+  if (!serviceId) { alert('Seleccione un servicio'); return; }
+
+  try {
+    var resp = await fetch('/onu/api/snmp/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial: serial, serviceId: serviceId })
+    });
+    var data = await resp.json();
+    if (data.success) {
+      closeAssign();
+      allServices = null;
+      snmpDiscover();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo asignar'));
+    }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function unassignOnu(serial) {
+  if (!confirm('Desasignar la ONU ' + serial + ' del cliente?')) return;
+  try {
+    var resp = await fetch('/onu/api/snmp/unassign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial: serial })
+    });
+    var data = await resp.json();
+    if (data.success) {
+      allServices = null;
+      snmpDiscover();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo desasignar'));
+    }
+  } catch (e) { alert('Error: ' + e.message); }
 }
 </script>
 

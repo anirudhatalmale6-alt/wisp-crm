@@ -60,7 +60,7 @@ module.exports = function(db) {
 
   // Update OLT settings
   router.post('/olt', (req, res) => {
-    const fields = ['olt_host', 'olt_port', 'olt_user', 'olt_pass', 'olt_model', 'snmp_community'];
+    const fields = ['olt_host', 'olt_port', 'olt_user', 'olt_pass', 'olt_model', 'snmp_community', 'snmp_write_community'];
     const update = db.prepare('INSERT OR REPLACE INTO settings (key, value, description) VALUES (?, ?, ?)');
     for (const key of fields) {
       if (req.body[key] !== undefined) {

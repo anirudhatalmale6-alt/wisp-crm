@@ -287,6 +287,82 @@ module.exports = function(db) {
     }
   });
 
+  // SNMP SET helper
+  function snmpSet(host, community, oid, type, value) {
+    return new Promise((resolve, reject) => {
+      const session = snmp.createSession(host, community, { timeout: 10000, retries: 1, version: snmp.Version2c });
+      const varbinds = [{ oid: oid, type: type, value: value }];
+      session.set(varbinds, (error, varbinds) => {
+        session.close();
+        if (error) return reject(error);
+        resolve(varbinds);
+      });
+    });
+  }
+
+  // API: SNMP - Reboot ONU via OLT
+  // HSGQ OLT uses admin action OID to reset/reboot an ONU
+  // Column 3 in ONU table (3.12.2.1.3.{index}) is typically admin status: set to 2 to reset
+  router.post('/api/snmp/reboot/:index', async (req, res) => {
+    const settings = getSettings();
+    const oltHost = settings.olt_host;
+    const writeCommunity = settings.snmp_write_community || 'private';
+
+    if (!oltHost) return res.json({ success: false, error: 'OLT no configurada' });
+
+    try {
+      const idx = req.params.index;
+      // Admin reset OID: set column 3 to 2 (reset/reboot)
+      const resetOid = '1.3.6.1.4.1.50224.3.12.2.1.3.' + idx;
+      await snmpSet(oltHost, writeCommunity, resetOid, snmp.ObjectType.Integer, 2);
+      res.json({ success: true, message: 'Comando de reinicio enviado a la ONU' });
+    } catch (e) {
+      res.json({ success: false, error: 'Error SNMP SET: ' + e.message });
+    }
+  });
+
+  // API: Assign ONU serial to a client service
+  router.post('/api/snmp/assign', (req, res) => {
+    const { serial, serviceId } = req.body;
+    if (!serial || !serviceId) return res.json({ success: false, error: 'Serial y servicio requeridos' });
+
+    try {
+      db.prepare('UPDATE client_services SET onu_serial = ? WHERE id = ?').run(serial, serviceId);
+      res.json({ success: true });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // API: Unassign ONU serial from a client service
+  router.post('/api/snmp/unassign', (req, res) => {
+    const { serial } = req.body;
+    if (!serial) return res.json({ success: false, error: 'Serial requerido' });
+
+    try {
+      db.prepare("UPDATE client_services SET onu_serial = '' WHERE onu_serial = ? COLLATE NOCASE").run(serial);
+      res.json({ success: true });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // API: Get all clients/services for assignment dropdown
+  router.get('/api/snmp/clients', (req, res) => {
+    try {
+      const services = db.prepare(`
+        SELECT cs.id as service_id, cs.plan_name, cs.pppoe_user, cs.onu_serial,
+               c.id as client_id, c.first_name, c.last_name
+        FROM client_services cs
+        JOIN clients c ON c.id = cs.client_id
+        ORDER BY c.last_name, c.first_name
+      `).all();
+      res.json({ services });
+    } catch (e) {
+      res.json({ services: [], error: e.message });
+    }
+  });
+
   // ========== GenieACS TR-069 Integration ==========
 
   const getNbiUrl = () => {
