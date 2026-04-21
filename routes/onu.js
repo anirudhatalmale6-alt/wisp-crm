@@ -187,13 +187,31 @@ module.exports = function(db) {
 
       // Cross-reference with CRM services to show which ONUs are assigned
       const assignedSerials = {};
-      db.prepare(`SELECT cs.onu_serial, cs.id as service_id, c.id as client_id, c.first_name, c.last_name
+      db.prepare(`SELECT cs.onu_serial, cs.id as service_id, cs.pppoe_user, cs.plan_name,
+               c.id as client_id, c.first_name, c.last_name
         FROM client_services cs JOIN clients c ON c.id = cs.client_id
         WHERE cs.onu_serial IS NOT NULL AND cs.onu_serial != ''`).all().forEach(row => {
         assignedSerials[row.onu_serial.toUpperCase()] = {
           serviceId: row.service_id,
           clientId: row.client_id,
-          clientName: row.first_name + ' ' + row.last_name
+          clientName: row.first_name + ' ' + row.last_name,
+          pppoeUser: row.pppoe_user || '',
+          planName: row.plan_name || ''
+        };
+      });
+
+      // Also build a map of PPPoE users for all services (for matching unassigned ONUs)
+      const allPppoe = {};
+      db.prepare(`SELECT cs.id as service_id, cs.pppoe_user, cs.plan_name, cs.onu_serial,
+               c.id as client_id, c.first_name, c.last_name
+        FROM client_services cs JOIN clients c ON c.id = cs.client_id
+        WHERE cs.pppoe_user IS NOT NULL AND cs.pppoe_user != ''`).all().forEach(row => {
+        allPppoe[row.service_id] = {
+          clientId: row.client_id,
+          clientName: row.first_name + ' ' + row.last_name,
+          pppoeUser: row.pppoe_user,
+          planName: row.plan_name || '',
+          hasOnu: !!(row.onu_serial)
         };
       });
 
@@ -203,6 +221,8 @@ module.exports = function(db) {
           onu.assigned = true;
           onu.clientId = assigned.clientId;
           onu.clientName = assigned.clientName;
+          onu.pppoeUser = assigned.pppoeUser;
+          onu.planName = assigned.planName;
         } else {
           onu.assigned = false;
         }

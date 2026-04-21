@@ -338,6 +338,7 @@ function renderOnuTable(onus) {
     html += '<td class="px-3 py-2.5 text-xs">';
     if (onu.assigned) {
       html += '<a href="/clients/' + onu.clientId + '" class="text-wisp-600 hover:text-wisp-700 font-medium"><i class="fas fa-user mr-1"></i>' + onu.clientName + '</a>';
+      if (onu.pppoeUser) html += '<br><span class="text-gray-400 font-mono">' + onu.pppoeUser + '</span>';
     } else {
       html += '<button onclick="openAssign(\'' + onu.serial + '\')" class="text-blue-500 hover:text-blue-700 text-xs"><i class="fas fa-link mr-1"></i>Asignar</button>';
     }
@@ -369,6 +370,7 @@ function filterOnuTable() {
         (o.model || '').toLowerCase().indexOf(search) >= 0 ||
         (o.vendor || '').toLowerCase().indexOf(search) >= 0 ||
         (o.clientName || '').toLowerCase().indexOf(search) >= 0 ||
+        (o.pppoeUser || '').toLowerCase().indexOf(search) >= 0 ||
         (o.onuId || '').toLowerCase().indexOf(search) >= 0;
     });
   }
@@ -430,10 +432,12 @@ async function openAssign(serial) {
 
   var html = '<option value="">-- Seleccionar servicio --</option>';
   allServices.forEach(function(s) {
-    var label = s.last_name + ' ' + s.first_name + ' - ' + (s.plan_name || 'Sin plan');
-    if (s.pppoe_user) label += ' (' + s.pppoe_user + ')';
+    var label = '';
+    if (s.pppoe_user) label = s.pppoe_user + ' | ';
+    label += s.first_name + ' ' + s.last_name;
+    if (s.plan_name) label += ' - ' + s.plan_name;
     if (s.onu_serial) label += ' [ONU: ' + s.onu_serial + ']';
-    html += '<option value="' + s.service_id + '">' + label + '</option>';
+    html += '<option value="' + s.service_id + '"' + (s.onu_serial ? ' style="color:#999"' : '') + '>' + label + '</option>';
   });
   select.innerHTML = html;
 }
