@@ -95,7 +95,7 @@ module.exports = function(db) {
     });
   });
 
-  // Send receipt after payment
+  // Send receipt after payment - opens WhatsApp on the phone with pre-filled message
   router.post('/send-receipt/:paymentId', (req, res) => {
     const payment = db.prepare(`SELECT p.*, c.first_name, c.last_name, c.phone, i.invoice_number
       FROM payments p JOIN clients c ON p.client_id = c.id
@@ -107,6 +107,11 @@ module.exports = function(db) {
       return res.redirect('/payments');
     }
 
+    if (!payment.phone) {
+      req.session.error = 'El cliente no tiene numero de telefono registrado';
+      return res.redirect('/payments');
+    }
+
     const settings = getSettings();
     const template = db.prepare("SELECT content FROM message_templates WHERE name = 'payment_received'").get();
     let message = (template ? template.content : 'Pago de {monto} recibido. Gracias.')
@@ -115,11 +120,18 @@ module.exports = function(db) {
       .replace(/{factura}/g, payment.invoice_number || 'N/A')
       .replace(/{empresa}/g, settings.company_name || 'WISP');
 
-    sendWhatsApp(payment.phone, message, payment.client_id).then(result => {
-      db.prepare('UPDATE payments SET receipt_sent = 1 WHERE id = ?').run(req.params.paymentId);
-      req.session.success = result.success ? 'Comprobante enviado por WhatsApp' : 'Comprobante registrado (' + result.reason + ')';
-      res.redirect(req.body.redirect || '/payments');
-    });
+    // Mark as sent
+    db.prepare('UPDATE payments SET receipt_sent = 1 WHERE id = ?').run(req.params.paymentId);
+
+    // Log it
+    db.prepare('INSERT INTO whatsapp_log (client_id, phone, message, status) VALUES (?, ?, ?, ?)').run(
+      payment.client_id, payment.phone, message, 'wa_link'
+    );
+
+    // Build wa.me link and redirect - opens WhatsApp on the phone
+    const phone = formatPhone(payment.phone);
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    res.redirect(waUrl);
   });
 
   // Templates management
