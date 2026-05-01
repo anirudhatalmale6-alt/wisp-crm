@@ -42,15 +42,18 @@ module.exports = function(db) {
       const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
       if (existing) continue;
 
-      // Check if this is the first invoice — prorate if installation_date is this month
+      // Check if this is the first invoice — prorate based on days since installation
       let amount = svc.price;
-      if (svc.installation_date) {
+      const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
+
+      if (!prevInvoice && svc.installation_date) {
         const instDate = new Date(svc.installation_date);
-        if (instDate.getFullYear() === year && instDate.getMonth() === month) {
-          const instDay = instDate.getDate();
-          const daysInMonth = lastDay;
-          const daysActive = daysInMonth - instDay + 1;
-          amount = Math.round((svc.price / daysInMonth) * daysActive * 100) / 100;
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUsed = Math.round((now.getTime() - instDate.getTime()) / msPerDay);
+
+        if (daysUsed > 0 && daysUsed < lastDay) {
+          amount = Math.round((svc.price / lastDay) * daysUsed * 100) / 100;
+          console.log(`[CRON] Proration: ${svc.first_name} ${svc.last_name} - ${daysUsed} dias de ${lastDay} = ${amount}`);
         }
       }
 

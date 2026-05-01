@@ -81,9 +81,20 @@ module.exports = function(db) {
         }
       }
 
-      const amount = svc.price;
-      const tax = amount * taxRate;
-      const total = amount + tax;
+      // Check if this is the first invoice — prorate based on days since installation
+      let amount = svc.price;
+      const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
+      if (!prevInvoice && svc.installation_date) {
+        const instDate = new Date(svc.installation_date);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUsed = Math.round((now.getTime() - instDate.getTime()) / msPerDay);
+        if (daysUsed > 0 && daysUsed < lastDay) {
+          amount = Math.round((svc.price / lastDay) * daysUsed * 100) / 100;
+        }
+      }
+
+      const tax = Math.round(amount * taxRate * 100) / 100;
+      const total = Math.round((amount + tax) * 100) / 100;
 
       const result = insert.run(svc.client_id, svc.id, generateInvoiceNumber(), periodStart, periodEnd, amount, tax, total, dueDate);
       generated++;
