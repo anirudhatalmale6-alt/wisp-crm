@@ -89,5 +89,28 @@ module.exports = function(db) {
     res.redirect('/payments');
   });
 
+  // Delete payment (admin only)
+  router.post('/:id/delete', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para eliminar pagos';
+      return res.redirect('/payments');
+    }
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(req.params.id);
+    if (!payment) {
+      req.session.error = 'Pago no encontrado';
+      return res.redirect('/payments');
+    }
+
+    // If this payment was linked to an invoice, revert invoice status to pending
+    if (payment.invoice_id) {
+      db.prepare("UPDATE invoices SET status = 'pending', paid_date = NULL WHERE id = ? AND status = 'paid'").run(payment.invoice_id);
+    }
+
+    db.prepare('DELETE FROM payments WHERE id = ?').run(req.params.id);
+    req.session.success = 'Pago eliminado';
+    res.redirect('/payments');
+  });
+
   return router;
 };

@@ -167,6 +167,11 @@
                     </button>
                   </form>
                 <% } %>
+                <form method="POST" action="/payments/<%= pay.id %>/delete" class="inline" onsubmit="return confirm('Eliminar este pago de <%= settings.currency || '$' %><%= pay.amount.toFixed(2) %> de <%= pay.first_name %> <%= pay.last_name %>?')">
+                  <button type="submit" title="Eliminar pago" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <i class="fas fa-trash-alt text-xs"></i>
+                  </button>
+                </form>
               </div>
             </td>
           </tr>
@@ -206,16 +211,21 @@
             <p><i class="fas fa-file-invoice w-4 text-center mr-1"></i> Factura <a href="/invoices/<%= pay.invoice_id %>" class="text-wisp-600 hover:text-wisp-700 font-mono">#<%= pay.invoice_number || pay.invoice_id %></a></p>
           <% } %>
         </div>
-        <div class="flex items-center gap-2 mt-3 pt-3 border-t">
-          <% if (!pay.receipt_sent) { %>
-            <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline">
-              <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fab fa-whatsapp mr-1"></i>Enviar Recibo</button>
-            </form>
-          <% } else { %>
-            <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline">
-              <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fas fa-check mr-1"></i>Recibo enviado <i class="fab fa-whatsapp ml-1"></i></button>
-            </form>
-          <% } %>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t">
+          <div>
+            <% if (!pay.receipt_sent) { %>
+              <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline">
+                <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fab fa-whatsapp mr-1"></i>Enviar Recibo</button>
+              </form>
+            <% } else { %>
+              <form method="POST" action="/whatsapp/send-receipt/<%= pay.id %>" class="inline">
+                <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium"><i class="fas fa-check mr-1"></i>Recibo enviado <i class="fab fa-whatsapp ml-1"></i></button>
+              </form>
+            <% } %>
+          </div>
+          <form method="POST" action="/payments/<%= pay.id %>/delete" class="inline" onsubmit="return confirm('Eliminar este pago?')">
+            <button type="submit" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt mr-1"></i>Eliminar</button>
+          </form>
         </div>
       </div>
       <% }) %>
