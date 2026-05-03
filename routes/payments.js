@@ -9,6 +9,22 @@ module.exports = function(db) {
     return s;
   };
 
+  // Helper: reactivate a suspended client
+  function reactivateClient(db, clientId, client) {
+    db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(clientId);
+    db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status = 'suspended'").run(clientId);
+    db.prepare("INSERT INTO service_cuts (client_id, action, reason) VALUES (?, 'reconnect', 'Pago recibido - reconexion manual')").run(clientId);
+
+    const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(clientId);
+    for (const svc of services) {
+      db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
+        VALUES (?, ?, 'reconnect', ?, ?, ?, ?)`).run(
+        clientId, svc.id, svc.pppoe_user || null, svc.ip_address || null,
+        svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
+      );
+    }
+  }
+
   // List payments
   router.get('/', (req, res) => {
     const { client_id, date_from, date_to } = req.query;
@@ -64,28 +80,50 @@ module.exports = function(db) {
       }
     }
 
-    // Reactivate client and services if suspended and all invoices paid
+    // Check if client is suspended — ask whether to reactivate
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
     if (client && client.status === 'suspended') {
       const pendingCount = db.prepare("SELECT COUNT(*) as count FROM invoices WHERE client_id = ? AND status = 'pending'").get(client_id).count;
-      if (pendingCount === 0) {
-        db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client_id);
-        db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status = 'suspended'").run(client_id);
-        db.prepare("INSERT INTO service_cuts (client_id, action, reason) VALUES (?, 'reconnect', 'Pago recibido - reconexión automática')").run(client_id);
+      const pendingTotal = db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status = 'pending'").get(client_id).total;
 
-        // Queue reconnect for all services
-        const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client_id);
-        for (const svc of services) {
-          db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
-            VALUES (?, ?, 'reconnect', ?, ?, ?, ?)`).run(
-            client_id, svc.id, svc.pppoe_user || null, svc.ip_address || null,
-            svc.connection_type || 'pppoe', `${client.first_name} ${client.last_name}`
-          );
-        }
+      if (pendingCount === 0) {
+        // All paid — auto-reactivate
+        reactivateClient(db, client_id, client);
+        req.session.success = 'Pago registrado. Cliente reactivado automaticamente (todas las facturas pagadas).';
+        return res.redirect('/payments');
+      } else {
+        // Still has pending invoices — ask the user
+        req.session.success = 'Pago registrado exitosamente';
+        return res.redirect(`/payments/reactivate?client_id=${client_id}&pending=${pendingCount}&pending_total=${pendingTotal.toFixed(2)}`);
       }
     }
 
     req.session.success = 'Pago registrado exitosamente';
+    res.redirect('/payments');
+  });
+
+  // Reactivation confirmation page
+  router.get('/reactivate', (req, res) => {
+    const { client_id, pending, pending_total } = req.query;
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
+    if (!client || client.status !== 'suspended') {
+      return res.redirect('/payments');
+    }
+    const settings = getSettings();
+    res.render('payments/reactivate', { client, pending, pending_total, settings });
+  });
+
+  // Process reactivation decision
+  router.post('/reactivate', (req, res) => {
+    const { client_id, action } = req.body;
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
+
+    if (action === 'reactivate' && client && client.status === 'suspended') {
+      reactivateClient(db, client_id, client);
+      req.session.success = `${client.first_name} ${client.last_name} reactivado exitosamente`;
+    } else {
+      req.session.success = `${client.first_name} ${client.last_name} se mantiene cortado`;
+    }
     res.redirect('/payments');
   });
 

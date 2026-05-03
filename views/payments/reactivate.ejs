@@ -1,0 +1,51 @@
+<%- include('../partials/header', { currentPage: 'payments', pageTitle: 'Reactivar Cliente' }) %>
+
+<div class="max-w-lg mx-auto mt-6">
+  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="px-6 py-5 border-b bg-yellow-50">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+          <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-gray-800">Pago registrado</h2>
+          <p class="text-sm text-gray-600">El cliente tiene facturas pendientes</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <div class="bg-gray-50 rounded-lg p-4 mb-5">
+        <p class="font-semibold text-gray-800 text-lg"><%= client.first_name %> <%= client.last_name %></p>
+        <p class="text-sm text-red-600 mt-1">
+          <i class="fas fa-ban mr-1"></i>Servicio cortado
+        </p>
+        <p class="text-sm text-gray-600 mt-2">
+          <i class="fas fa-file-invoice mr-1"></i><%= pending %> factura<%= pending > 1 ? 's' : '' %> pendiente<%= pending > 1 ? 's' : '' %>
+          por <%= settings.currency || 'RD$' %><%= pending_total %>
+        </p>
+      </div>
+
+      <p class="text-sm text-gray-700 mb-5">Desea reactivar el servicio de este cliente o dejarlo cortado?</p>
+
+      <div class="flex gap-3">
+        <form method="POST" action="/payments/reactivate" class="flex-1">
+          <input type="hidden" name="client_id" value="<%= client.id %>">
+          <input type="hidden" name="action" value="reactivate">
+          <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fas fa-check-circle mr-2"></i>Reactivar Servicio
+          </button>
+        </form>
+        <form method="POST" action="/payments/reactivate" class="flex-1">
+          <input type="hidden" name="client_id" value="<%= client.id %>">
+          <input type="hidden" name="action" value="keep_cut">
+          <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fas fa-ban mr-2"></i>Dejar Cortado
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>
