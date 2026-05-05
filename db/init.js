@@ -175,6 +175,9 @@ module.exports = function(db) {
     FOREIGN KEY (invoice_id) REFERENCES invoices(id)
   )`);
 
+  // Add receipt_token to payments
+  try { db.exec('ALTER TABLE payments ADD COLUMN receipt_token TEXT'); } catch(e) {}
+
   // WhatsApp message log
   db.exec(`CREATE TABLE IF NOT EXISTS whatsapp_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const crypto = require('crypto');
 
 module.exports = function(db) {
   const router = express.Router();
@@ -95,7 +96,7 @@ module.exports = function(db) {
     });
   });
 
-  // Send receipt after payment - opens WhatsApp on the phone with pre-filled message
+  // Send receipt after payment - opens WhatsApp on the phone with pre-filled message + receipt link
   router.post('/send-receipt/:paymentId', (req, res) => {
     const payment = db.prepare(`SELECT p.*, c.first_name, c.last_name, c.phone, i.invoice_number
       FROM payments p JOIN clients c ON p.client_id = c.id
@@ -113,12 +114,40 @@ module.exports = function(db) {
     }
 
     const settings = getSettings();
+
+    // Generate receipt token if not exists
+    let token = payment.receipt_token;
+    if (!token) {
+      token = crypto.randomBytes(16).toString('hex');
+      db.prepare('UPDATE payments SET receipt_token = ? WHERE id = ?').run(token, payment.id);
+    }
+
+    // Build receipt URL
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const receiptUrl = `${protocol}://${host}/receipt/${token}`;
+
+    // Get invoice number - try harder to find it
+    let invoiceNum = payment.invoice_number;
+    if (!invoiceNum && payment.invoice_id) {
+      const inv = db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(payment.invoice_id);
+      invoiceNum = inv ? inv.invoice_number : null;
+    }
+    if (!invoiceNum) {
+      // Find the most recent invoice for this client
+      const latestInv = db.prepare("SELECT invoice_number FROM invoices WHERE client_id = ? ORDER BY created_at DESC LIMIT 1").get(payment.client_id);
+      invoiceNum = latestInv ? latestInv.invoice_number : null;
+    }
+
     const template = db.prepare("SELECT content FROM message_templates WHERE name = 'payment_received'").get();
-    let message = (template ? template.content : 'Pago de {monto} recibido. Gracias.')
+    let message = (template ? template.content : 'Hola {nombre}, hemos recibido su pago de {monto}. Su servicio esta al dia. Gracias!')
       .replace(/{nombre}/g, `${payment.first_name} ${payment.last_name}`)
-      .replace(/{monto}/g, `${settings.currency || '$'}${payment.amount.toFixed(2)}`)
-      .replace(/{factura}/g, payment.invoice_number || 'N/A')
+      .replace(/{monto}/g, `${settings.currency || 'RD$'}${payment.amount.toFixed(2)}`)
+      .replace(/{factura}/g, invoiceNum || '')
       .replace(/{empresa}/g, settings.company_name || 'WISP');
+
+    // Add receipt link
+    message += `\n\nRecibo: ${receiptUrl}`;
 
     // Mark as sent
     db.prepare('UPDATE payments SET receipt_sent = 1 WHERE id = ?').run(req.params.paymentId);
@@ -128,7 +157,7 @@ module.exports = function(db) {
       payment.client_id, payment.phone, message, 'wa_link'
     );
 
-    // Build wa.me link and redirect - opens WhatsApp on the phone
+    // Build wa.me link and redirect
     const phone = formatPhone(payment.phone);
     const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     res.redirect(waUrl);

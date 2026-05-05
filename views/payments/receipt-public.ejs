@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recibo de Pago - <%= settings.company_name || 'WISP' %></title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+    .container { max-width: 500px; margin: 20px auto; padding: 0 16px; }
+    .receipt { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #0d7377, #14919b); color: #fff; padding: 28px 24px; text-align: center; }
+    .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .header p { font-size: 13px; opacity: 0.85; }
+    .check-icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px; }
+    .body { padding: 24px; }
+    .amount-box { text-align: center; padding: 20px; background: #f0fdf4; border-radius: 12px; margin-bottom: 20px; }
+    .amount-box .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
+    .amount-box .amount { font-size: 32px; font-weight: 800; color: #059669; margin-top: 4px; }
+    .details { border-top: 1px solid #e5e7eb; padding-top: 16px; }
+    .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+    .row:last-child { border-bottom: none; }
+    .row .label { color: #6b7280; font-size: 13px; }
+    .row .value { font-weight: 600; font-size: 13px; text-align: right; max-width: 60%; }
+    .footer { padding: 16px 24px; background: #f9fafb; text-align: center; border-top: 1px solid #e5e7eb; }
+    .footer p { font-size: 11px; color: #9ca3af; }
+    .btn-print { display: inline-block; margin-top: 16px; padding: 12px 32px; background: #0d7377; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn-print:hover { background: #0a5f62; }
+    .print-area { text-align: center; padding: 16px; }
+    @media print {
+      body { background: #fff; }
+      .container { margin: 0; padding: 0; max-width: 100%; }
+      .receipt { box-shadow: none; border-radius: 0; }
+      .print-area { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="receipt">
+      <div class="header">
+        <div class="check-icon">&#10003;</div>
+        <h1><%= settings.company_name || 'WISP' %></h1>
+        <p>Comprobante de Pago</p>
+      </div>
+
+      <div class="body">
+        <div class="amount-box">
+          <div class="label">Monto Pagado</div>
+          <div class="amount"><%= settings.currency || 'RD$' %><%= payment.amount.toFixed(2) %></div>
+        </div>
+
+        <div class="details">
+          <div class="row">
+            <span class="label">Cliente</span>
+            <span class="value"><%= payment.first_name %> <%= payment.last_name %></span>
+          </div>
+          <% if (payment.invoice_num) { %>
+          <div class="row">
+            <span class="label">Factura</span>
+            <span class="value">#<%= payment.invoice_num %></span>
+          </div>
+          <% } %>
+          <% if (payment.period_start && payment.period_end) { %>
+          <div class="row">
+            <span class="label">Periodo</span>
+            <span class="value"><%= payment.period_start %> al <%= payment.period_end %></span>
+          </div>
+          <% } %>
+          <% if (payment.plan_name) { %>
+          <div class="row">
+            <span class="label">Plan</span>
+            <span class="value"><%= payment.plan_name %><%= payment.speed_down ? ' (' + payment.speed_down + ')' : '' %></span>
+          </div>
+          <% } %>
+          <div class="row">
+            <span class="label">Metodo de Pago</span>
+            <span class="value"><%= payment.payment_method === 'cash' ? 'Efectivo' : payment.payment_method === 'transfer' ? 'Transferencia' : payment.payment_method === 'card' ? 'Tarjeta' : (payment.payment_method || 'Otro') %></span>
+          </div>
+          <% if (payment.reference) { %>
+          <div class="row">
+            <span class="label">Referencia</span>
+            <span class="value"><%= payment.reference %></span>
+          </div>
+          <% } %>
+          <div class="row">
+            <span class="label">Fecha</span>
+            <span class="value"><%= new Date(payment.created_at).toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }) %></span>
+          </div>
+          <div class="row">
+            <span class="label">Hora</span>
+            <span class="value"><%= new Date(payment.created_at).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }) %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p><%= settings.company_name || 'WISP' %><%= settings.company_phone ? ' | ' + settings.company_phone : '' %></p>
+        <p style="margin-top: 4px;">Gracias por su pago</p>
+      </div>
+    </div>
+
+    <div class="print-area">
+      <button class="btn-print" onclick="window.print()">Descargar / Imprimir</button>
+    </div>
+  </div>
+</body>
+</html>

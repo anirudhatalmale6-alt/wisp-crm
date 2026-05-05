@@ -68,6 +68,36 @@ const mikrotikRoutes = require('./routes/mikrotik')(db);
 const usersRoutes = require('./routes/users')(db);
 const onuRoutes = require('./routes/onu')(db);
 
+// Public receipt page (no auth required - accessed by clients via WhatsApp link)
+app.get('/receipt/:token', (req, res) => {
+  const payment = db.prepare(`SELECT p.*, c.first_name, c.last_name, c.phone, c.address, c.cedula,
+           i.invoice_number, i.period_start, i.period_end,
+           COALESCE(pl.name, '') as plan_name, COALESCE(pl.speed_down, '') as speed_down
+    FROM payments p
+    JOIN clients c ON p.client_id = c.id
+    LEFT JOIN invoices i ON p.invoice_id = i.id
+    LEFT JOIN client_services cs ON cs.client_id = c.id
+    LEFT JOIN plans pl ON pl.id = cs.plan_id
+    WHERE p.receipt_token = ?`).get(req.params.token);
+
+  if (!payment) {
+    return res.status(404).send('<h1>Recibo no encontrado</h1>');
+  }
+
+  const settings = {};
+  db.prepare('SELECT key, value FROM settings').all().forEach(r => settings[r.key] = r.value);
+
+  // Find invoice number if not directly linked
+  let invoiceNum = payment.invoice_number;
+  if (!invoiceNum) {
+    const latestInv = db.prepare("SELECT invoice_number FROM invoices WHERE client_id = ? ORDER BY created_at DESC LIMIT 1").get(payment.client_id);
+    invoiceNum = latestInv ? latestInv.invoice_number : '';
+  }
+  payment.invoice_num = invoiceNum;
+
+  res.render('payments/receipt-public', { payment, settings });
+});
+
 app.use('/', authRoutes);
 app.use('/dashboard', requireAuth, dashboardRoutes);
 app.use('/clients', requireAuth, clientRoutes);
