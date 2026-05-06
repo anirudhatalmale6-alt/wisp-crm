@@ -56,10 +56,14 @@ module.exports = function(db) {
 
     if (search) {
       const cleanSearch = search.replace(/[-() ]/g, '');
-      sql += ` AND (c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ? OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?)`;
+      sql += ` AND (c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE
+        OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ?
+        OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?
+        OR c.address LIKE ? COLLATE NOCASE OR c.cedula LIKE ?
+        OR c.id IN (SELECT cs.client_id FROM client_services cs WHERE cs.pppoe_user LIKE ? COLLATE NOCASE OR cs.label LIKE ? COLLATE NOCASE OR cs.ip_address LIKE ? OR cs.onu_serial LIKE ? COLLATE NOCASE))`;
       const s = `%${search}%`;
       const sp = `%${cleanSearch}%`;
-      params.push(s, s, sp, s, s);
+      params.push(s, s, sp, s, s, s, s, s, s, s, s);
     }
     if (status) { sql += ` AND c.status = ?`; params.push(status); }
     if (plan_id) { sql += ` AND c.plan_id = ?`; params.push(plan_id); }
@@ -101,8 +105,12 @@ module.exports = function(db) {
     const clients = db.prepare(`SELECT c.id, c.first_name, c.last_name, c.phone, c.status,
       p.name as plan_name, c.ip_address
       FROM clients c LEFT JOIN plans p ON c.plan_id = p.id
-      WHERE c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ? OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?
-      ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, sp, s, s);
+      WHERE c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE
+        OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ?
+        OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?
+        OR c.address LIKE ? COLLATE NOCASE OR c.cedula LIKE ?
+        OR c.id IN (SELECT cs.client_id FROM client_services cs WHERE cs.pppoe_user LIKE ? COLLATE NOCASE OR cs.label LIKE ? COLLATE NOCASE OR cs.ip_address LIKE ? OR cs.onu_serial LIKE ? COLLATE NOCASE)
+      ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, sp, s, s, s, s, s, s, s, s);
     res.json(clients);
   });
 
