@@ -15,15 +15,35 @@ module.exports = function(db) {
   };
 
   // Calculate balance for a client: total paid - total invoiced (pending/overdue)
+  // Also auto-apply payments to pending invoices if there's enough credit
   const getClientBalance = (clientId) => {
-    const invoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status IN ('pending', 'overdue')`).get(clientId);
     const paid = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?`).get(clientId);
     const totalInvoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'`).get(clientId);
+    const paidInvoicesTotal = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status = 'paid'`).get(clientId);
+
+    // Auto-apply: if there's enough paid to cover pending invoices, mark them as paid
+    let remaining = paid.total - paidInvoicesTotal.total;
+    if (remaining > 0) {
+      const pendingInvoices = db.prepare("SELECT * FROM invoices WHERE client_id = ? AND status IN ('pending', 'overdue') ORDER BY due_date ASC").all(clientId);
+      const today = new Date().toISOString().split('T')[0];
+      for (const inv of pendingInvoices) {
+        if (remaining >= inv.total) {
+          db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(today, inv.id);
+          remaining -= inv.total;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Recalculate after auto-apply
+    const invoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status IN ('pending', 'overdue')`).get(clientId);
+
     return {
       pending: invoiced.total,
       totalPaid: paid.total,
       totalInvoiced: totalInvoiced.total,
-      balance: paid.total - totalInvoiced.total // positive = credit, negative = debt
+      balance: paid.total - totalInvoiced.total
     };
   };
 
