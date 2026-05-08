@@ -139,12 +139,22 @@ module.exports = function(db) {
       invoiceNum = latestInv ? latestInv.invoice_number : null;
     }
 
-    const template = db.prepare("SELECT content FROM message_templates WHERE name = 'payment_received'").get();
-    let message = (template ? template.content : 'Hola {nombre}, hemos recibido su pago de {monto}. Su servicio esta al dia. Gracias!')
-      .replace(/{nombre}/g, `${payment.first_name} ${payment.last_name}`)
-      .replace(/{monto}/g, `${settings.currency || 'RD$'}${payment.amount.toFixed(2)}`)
-      .replace(/{factura}/g, invoiceNum || '')
-      .replace(/{empresa}/g, settings.company_name || 'WISP');
+    // Check remaining debt after this payment
+    const currency = settings.currency || 'RD$';
+    const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?').get(payment.client_id).total;
+    const totalInvoiced = db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'").get(payment.client_id).total;
+    const remainingDebt = totalInvoiced - totalPaid;
+
+    let statusMsg;
+    if (remainingDebt <= 0) {
+      statusMsg = 'Su servicio esta al dia.';
+    } else {
+      statusMsg = `Su balance pendiente es ${currency}${remainingDebt.toFixed(2)}.`;
+    }
+
+    let message = `Hola ${payment.first_name} ${payment.last_name}, hemos recibido su pago de ${currency}${payment.amount.toFixed(2)}`;
+    if (invoiceNum) message += ` para la factura #${invoiceNum}`;
+    message += `. ${statusMsg} Gracias por su pago!`;
 
     // Add receipt link
     message += `\n\nRecibo: ${receiptUrl}`;
