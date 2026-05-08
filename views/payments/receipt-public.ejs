@@ -9,14 +9,19 @@
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
     .container { max-width: 500px; margin: 20px auto; padding: 0 16px; }
     .receipt { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #0d7377, #14919b); color: #fff; padding: 28px 24px; text-align: center; }
-    .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; padding: 28px 24px; text-align: center; }
+    .header .logo { max-width: 220px; height: auto; margin: 0 auto 12px; display: block; }
     .header p { font-size: 13px; opacity: 0.85; }
-    .check-icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px; }
     .body { padding: 24px; }
-    .amount-box { text-align: center; padding: 20px; background: #f0fdf4; border-radius: 12px; margin-bottom: 20px; }
+    .amount-box { text-align: center; padding: 20px; background: #f0fdf4; border-radius: 12px; margin-bottom: 16px; }
     .amount-box .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
     .amount-box .amount { font-size: 32px; font-weight: 800; color: #059669; margin-top: 4px; }
+    .balance-box { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 20px; }
+    .balance-box.debt { background: #fef2f2; }
+    .balance-box.clear { background: #f0fdf4; }
+    .balance-box .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
+    .balance-box.debt .amount { font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px; }
+    .balance-box.clear .amount { font-size: 16px; font-weight: 700; color: #059669; margin-top: 4px; }
     .details { border-top: 1px solid #e5e7eb; padding-top: 16px; }
     .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
     .row:last-child { border-bottom: none; }
@@ -24,8 +29,8 @@
     .row .value { font-weight: 600; font-size: 13px; text-align: right; max-width: 60%; }
     .footer { padding: 16px 24px; background: #f9fafb; text-align: center; border-top: 1px solid #e5e7eb; }
     .footer p { font-size: 11px; color: #9ca3af; }
-    .btn-print { display: inline-block; margin-top: 16px; padding: 12px 32px; background: #0d7377; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
-    .btn-print:hover { background: #0a5f62; }
+    .btn-print { display: inline-block; margin-top: 16px; padding: 12px 32px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn-print:hover { background: #0f0f1e; }
     .print-area { text-align: center; padding: 16px; }
     @media print {
       body { background: #fff; }
@@ -39,16 +44,27 @@
   <div class="container">
     <div class="receipt">
       <div class="header">
-        <div class="check-icon">&#10003;</div>
-        <h1><%= settings.company_name || 'WISP' %></h1>
+        <img src="/img/logo.png" alt="<%= settings.company_name || 'WISP' %>" class="logo">
         <p>Comprobante de Pago</p>
       </div>
 
       <div class="body">
         <div class="amount-box">
           <div class="label">Monto Pagado</div>
-          <div class="amount"><%= settings.currency || 'RD$' %><%= payment.amount.toFixed(2) %></div>
+          <div class="amount"><%= currency %><%= payment.amount.toFixed(2) %></div>
         </div>
+
+        <% if (remainingDebt > 0) { %>
+        <div class="balance-box debt">
+          <div class="label">Balance Pendiente</div>
+          <div class="amount"><%= currency %><%= remainingDebt.toFixed(2) %></div>
+        </div>
+        <% } else { %>
+        <div class="balance-box clear">
+          <div class="label">Estado de Cuenta</div>
+          <div class="amount">Al dia - Sin balance pendiente</div>
+        </div>
+        <% } %>
 
         <div class="details">
           <div class="row">

@@ -95,7 +95,13 @@ app.get('/receipt/:token', (req, res) => {
   }
   payment.invoice_num = invoiceNum;
 
-  res.render('payments/receipt-public', { payment, settings });
+  // Calculate remaining debt
+  const currency = settings.currency || 'RD$';
+  const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?').get(payment.client_id).total;
+  const totalInvoiced = db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'").get(payment.client_id).total;
+  const remainingDebt = totalInvoiced - totalPaid;
+
+  res.render('payments/receipt-public', { payment, settings, remainingDebt, currency });
 });
 
 app.use('/', authRoutes);
