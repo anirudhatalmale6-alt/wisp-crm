@@ -300,7 +300,23 @@ module.exports = function(db) {
       FROM client_services cs LEFT JOIN plans p ON cs.plan_id = p.id
       WHERE cs.client_id = ? ORDER BY cs.created_at ASC`).all(req.params.id);
     const plans = db.prepare('SELECT * FROM plans WHERE active = 1 ORDER BY name').all();
-    const invoices = db.prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id);
+    const invoicesRaw = db.prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY due_date ASC').all(req.params.id);
+    const totalPaidAll = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?').get(req.params.id).total;
+    // Distribute payments across invoices oldest-first to calculate remaining per invoice
+    let remaining = totalPaidAll;
+    for (const inv of invoicesRaw) {
+      const invTotal = inv.total || inv.amount || 0;
+      if (remaining >= invTotal) {
+        inv.paid_amount = invTotal;
+        remaining -= invTotal;
+      } else if (remaining > 0) {
+        inv.paid_amount = remaining;
+        remaining = 0;
+      } else {
+        inv.paid_amount = 0;
+      }
+    }
+    const invoices = invoicesRaw.reverse();
     const payments = db.prepare('SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id);
     const messages = db.prepare('SELECT * FROM whatsapp_log WHERE client_id = ? ORDER BY created_at DESC LIMIT 20').all(req.params.id);
     const cuts = db.prepare('SELECT * FROM service_cuts WHERE client_id = ? ORDER BY created_at DESC LIMIT 10').all(req.params.id);

@@ -761,8 +761,10 @@ document.addEventListener('DOMContentLoaded', function() {
           <thead>
             <tr class="bg-gray-50 border-b">
               <th class="text-left px-4 py-3 font-semibold text-gray-600"># Factura</th>
-              <th class="text-left px-4 py-3 font-semibold text-gray-600">Período</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Periodo</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600">Monto</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Pagado</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Resta</th>
               <th class="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Vencimiento</th>
               <th class="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
@@ -770,10 +772,15 @@ document.addEventListener('DOMContentLoaded', function() {
           </thead>
           <tbody class="divide-y">
             <% invoices.forEach(inv => { %>
+            <% const invTotal = Number(inv.total || inv.amount || 0); %>
+            <% const invPaid = Number(inv.paid_amount || 0); %>
+            <% const invRemaining = inv.status === 'paid' ? 0 : Math.max(invTotal - invPaid, 0); %>
             <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-mono text-gray-700">#<%= inv.id %></td>
-              <td class="px-4 py-3 text-gray-600"><%= inv.period || '--' %></td>
-              <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= currency %><%= Number(inv.amount || 0).toFixed(2) %></td>
+              <td class="px-4 py-3 font-mono text-gray-700">#<%= inv.invoice_number || inv.id %></td>
+              <td class="px-4 py-3 text-gray-600"><%= inv.period_start && inv.period_end ? inv.period_start + ' al ' + inv.period_end : '--' %></td>
+              <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= currency %><%= invTotal.toFixed(2) %></td>
+              <td class="px-4 py-3 text-right font-semibold text-green-600"><%= invPaid > 0 ? currency + invPaid.toFixed(2) : '--' %></td>
+              <td class="px-4 py-3 text-right font-bold <%= invRemaining > 0 ? 'text-red-600' : 'text-green-600' %>"><%= inv.status === 'paid' ? currency + '0.00' : (invRemaining > 0 ? currency + invRemaining.toFixed(2) : currency + '0.00') %></td>
               <td class="px-4 py-3 text-center">
                 <% if (inv.status === 'paid') { %>
                   <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Pagada</span>
