@@ -45,8 +45,9 @@ module.exports = function(db) {
 
     try {
       const formatted = formatPhone(phone);
-      await axios.post(
-        `https://graph.facebook.com/v17.0/${phoneId}/messages`,
+      console.log(`[WhatsApp] Sending to ${formatted} via phone_id ${phoneId}`);
+      const resp = await axios.post(
+        `https://graph.facebook.com/v22.0/${phoneId}/messages`,
         {
           messaging_product: 'whatsapp',
           to: formatted,
@@ -56,15 +57,20 @@ module.exports = function(db) {
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
 
+      console.log('[WhatsApp] Success:', JSON.stringify(resp.data));
       db.prepare('INSERT INTO whatsapp_log (client_id, phone, message, status) VALUES (?, ?, ?, ?)').run(
         clientId, phone, message, 'sent'
       );
       return { success: true };
     } catch (err) {
+      const errMsg = err.response?.data?.error?.message || err.message;
+      const errCode = err.response?.data?.error?.code || '';
+      console.error(`[WhatsApp] Error ${errCode}: ${errMsg}`);
+      console.error('[WhatsApp] Full error:', JSON.stringify(err.response?.data || {}));
       db.prepare('INSERT INTO whatsapp_log (client_id, phone, message, status) VALUES (?, ?, ?, ?)').run(
-        clientId, phone, message, 'error'
+        clientId, phone, message, 'failed'
       );
-      return { success: false, reason: err.response?.data?.error?.message || err.message };
+      return { success: false, reason: errMsg };
     }
   };
 

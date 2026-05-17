@@ -73,9 +73,17 @@
                   <span class="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
                     <i class="fas fa-check-double mr-1"></i>Enviado
                   </span>
-                <% } else if (msg.status === 'failed') { %>
+                <% } else if (msg.status === 'failed' || msg.status === 'error') { %>
                   <span class="inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">
                     <i class="fas fa-times mr-1"></i>Fallido
+                  </span>
+                <% } else if (msg.status === 'not_configured' || msg.status === 'no_credentials') { %>
+                  <span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">
+                    <i class="fas fa-ban mr-1"></i>No configurado
+                  </span>
+                <% } else if (msg.status === 'wa_link') { %>
+                  <span class="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                    <i class="fab fa-whatsapp mr-1"></i>Link wa.me
                   </span>
                 <% } else { %>
                   <span class="inline-block bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">
