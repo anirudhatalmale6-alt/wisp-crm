@@ -162,15 +162,27 @@ module.exports = function(db) {
     // Mark as sent
     db.prepare('UPDATE payments SET receipt_sent = 1 WHERE id = ?').run(req.params.paymentId);
 
-    // Log it
-    db.prepare('INSERT INTO whatsapp_log (client_id, phone, message, status) VALUES (?, ?, ?, ?)').run(
-      payment.client_id, payment.phone, message, 'wa_link'
-    );
+    const redirect = req.body.redirect || '/payments';
 
-    // Build wa.me link and redirect
-    const phone = formatPhone(payment.phone);
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    res.redirect(waUrl);
+    // If WhatsApp API is configured, send directly via API
+    if (settings.whatsapp_enabled === '1' && settings.whatsapp_phone_id && settings.whatsapp_token) {
+      sendWhatsApp(payment.phone, message, payment.client_id).then(result => {
+        if (result.success) {
+          req.session.success = `Recibo enviado por WhatsApp a ${payment.first_name} ${payment.last_name}`;
+        } else {
+          req.session.success = `Recibo registrado (WhatsApp: ${result.reason})`;
+        }
+        res.redirect(redirect);
+      });
+    } else {
+      // Fallback: wa.me link
+      db.prepare('INSERT INTO whatsapp_log (client_id, phone, message, status) VALUES (?, ?, ?, ?)').run(
+        payment.client_id, payment.phone, message, 'wa_link'
+      );
+      const phone = formatPhone(payment.phone);
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      res.redirect(waUrl);
+    }
   });
 
   // Templates management
