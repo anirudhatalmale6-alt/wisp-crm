@@ -7,7 +7,8 @@ module.exports = function(db) {
     return s;
   };
 
-  // Auto-generate invoices daily at 6:00 AM — only for services whose billing day matches today
+  // Auto-generate invoices daily at 6:00 AM
+  // Catches up missed billing days: generates for any billing day <= today that has no invoice yet
   cron.schedule('0 6 * * *', () => {
     const now = new Date();
     const today = now.getDate();
@@ -15,11 +16,10 @@ module.exports = function(db) {
     const month = now.getMonth();
     const lastDay = new Date(year, month + 1, 0).getDate();
 
-    console.log(`[CRON] Checking invoice generation for day ${today}...`);
+    console.log(`[CRON] Checking invoice generation (day ${today}, catch-up enabled)...`);
     const settings = getSettings();
     const taxRate = parseFloat(settings.tax_rate || '0') / 100;
 
-    // Get services whose billing day is today (or last day of month if billing day > last day)
     const activeServices = db.prepare(`SELECT cs.*, p.price, c.first_name, c.last_name FROM client_services cs
       JOIN plans p ON cs.plan_id = p.id
       JOIN clients c ON cs.client_id = c.id
@@ -32,8 +32,8 @@ module.exports = function(db) {
       const billingDay = svc.billing_day || 1;
       const effectiveBillingDay = Math.min(billingDay, lastDay);
 
-      // Only generate invoice if today is this service's billing day
-      if (today !== effectiveBillingDay) continue;
+      // Generate if billing day has passed (or is today) and no invoice exists yet
+      if (effectiveBillingDay > today) continue;
 
       const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const periodEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
@@ -65,8 +65,9 @@ module.exports = function(db) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         svc.client_id, svc.id, `${prefix}-${seq}`, periodStart, periodEnd, amount, tax, total, dueDate
       );
+      console.log(`[CRON] Invoice: ${svc.first_name} ${svc.last_name} - ${total}`);
     }
-    console.log(`[CRON] ${count} invoices generated for day ${today}`);
+    console.log(`[CRON] ${count} invoices generated`);
   });
 
   // Auto-cut service for overdue services (daily at 8:00 AM)
@@ -92,7 +93,7 @@ module.exports = function(db) {
 
     for (const svc of overdueServices) {
       db.prepare("UPDATE client_services SET status = 'suspended' WHERE id = ?").run(svc.service_id);
-      db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'cut', 'Corte automático por mora', 1)").run(svc.client_id, svc.service_id);
+      db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'cut', 'Corte automatico por mora', 1)").run(svc.client_id, svc.service_id);
 
       // Check if ALL services of this client are now suspended
       const activeCount = db.prepare("SELECT COUNT(*) as count FROM client_services WHERE client_id = ? AND status = 'active'").get(svc.client_id).count;

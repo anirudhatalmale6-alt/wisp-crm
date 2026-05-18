@@ -70,14 +70,13 @@ const onuRoutes = require('./routes/onu')(db);
 
 // Public receipt page (no auth required - accessed by clients via WhatsApp link)
 app.get('/receipt/:token', (req, res) => {
-  const payment = db.prepare(`SELECT p.*, c.first_name, c.last_name, c.phone, c.address, c.cedula,
+  const payment = db.prepare(`SELECT p.*, c.first_name, c.last_name, c.phone, c.address,
            i.invoice_number, i.period_start, i.period_end,
            COALESCE(pl.name, '') as plan_name, COALESCE(pl.speed_down, '') as speed_down
     FROM payments p
     JOIN clients c ON p.client_id = c.id
     LEFT JOIN invoices i ON p.invoice_id = i.id
-    LEFT JOIN client_services cs ON cs.client_id = c.id
-    LEFT JOIN plans pl ON pl.id = cs.plan_id
+    LEFT JOIN plans pl ON pl.id = c.plan_id
     WHERE p.receipt_token = ?`).get(req.params.token);
 
   if (!payment) {

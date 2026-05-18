@@ -48,8 +48,8 @@ module.exports = function(db) {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
 
-    // Generate invoices per service (supports multiple services per client)
     const activeServices = db.prepare(`
       SELECT cs.*, p.price, c.first_name, c.last_name FROM client_services cs
       JOIN plans p ON cs.plan_id = p.id
@@ -59,20 +59,16 @@ module.exports = function(db) {
 
     let generated = 0;
     let autoPaid = 0;
-    const insert = db.prepare(`INSERT INTO invoices (client_id, service_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     for (const svc of activeServices) {
       const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-      const lastDay = new Date(year, month + 1, 0).getDate();
       const periodEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
       const dueDay = Math.min(svc.billing_day || 1, lastDay);
       const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
 
-      // Check if invoice already exists for this service+period
       const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
       if (existing) continue;
-      // Fallback: check by client_id if no service_id match (backward compat for single-service clients)
+      // Fallback: check by client_id for single-service clients
       if (!existing) {
         const svcCount = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(svc.client_id).count;
         if (svcCount === 1) {
@@ -81,7 +77,6 @@ module.exports = function(db) {
         }
       }
 
-      // Check if this is the first invoice — prorate based on days since installation
       let amount = svc.price;
       const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
       if (!prevInvoice && svc.installation_date) {
@@ -96,10 +91,13 @@ module.exports = function(db) {
       const tax = Math.round(amount * taxRate * 100) / 100;
       const total = Math.round((amount + tax) * 100) / 100;
 
-      const result = insert.run(svc.client_id, svc.id, generateInvoiceNumber(), periodStart, periodEnd, amount, tax, total, dueDate);
+      const result = db.prepare(`INSERT INTO invoices (client_id, service_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        svc.client_id, svc.id, generateInvoiceNumber(), periodStart, periodEnd, amount, tax, total, dueDate
+      );
       generated++;
 
-      // Auto-pay if client has enough credit (balance a favor)
+      // Auto-pay if client has enough credit
       const totalPaid = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE client_id = ?`).get(svc.client_id);
       const totalInvoiced = db.prepare(`SELECT COALESCE(SUM(total), 0) as total FROM invoices WHERE client_id = ? AND status != 'cancelled'`).get(svc.client_id);
       const balance = totalPaid.total - totalInvoiced.total;
@@ -109,14 +107,14 @@ module.exports = function(db) {
         const today = new Date().toISOString().split('T')[0];
         db.prepare("UPDATE invoices SET status = 'paid', paid_date = ? WHERE id = ?").run(today, invoiceId);
         db.prepare('INSERT INTO payments (client_id, invoice_id, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?)').run(
-          svc.client_id, invoiceId, total, 'credit', 'Pago automático desde saldo a favor'
+          svc.client_id, invoiceId, total, 'credit', 'Pago automatico desde saldo a favor'
         );
         autoPaid++;
       }
     }
 
     const msg = autoPaid > 0
-      ? `${generated} facturas generadas (${autoPaid} pagadas automáticamente desde saldo a favor)`
+      ? `${generated} facturas generadas (${autoPaid} pagadas automaticamente desde saldo a favor)`
       : `${generated} facturas generadas`;
     req.session.success = msg;
     res.redirect('/invoices');
