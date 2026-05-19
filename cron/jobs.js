@@ -28,6 +28,14 @@ module.exports = function(db) {
     let count = 0;
     const prefix = `FAC-${year}${String(month + 1).padStart(2, '0')}`;
 
+    // Find the highest existing sequence number for this month to avoid duplicates
+    const lastInv = db.prepare("SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1").get(prefix + '%');
+    let seq = 0;
+    if (lastInv) {
+      const parts = lastInv.invoice_number.split('-');
+      seq = parseInt(parts[2] || '0');
+    }
+
     for (const svc of activeServices) {
       const billingDay = svc.billing_day || 1;
       const effectiveBillingDay = Math.min(billingDay, lastDay);
@@ -42,7 +50,6 @@ module.exports = function(db) {
       const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
       if (existing) continue;
 
-      // Check if this is the first invoice — prorate based on days since installation
       let amount = svc.price;
       const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
 
@@ -59,13 +66,18 @@ module.exports = function(db) {
 
       const tax = Math.round(amount * taxRate * 100) / 100;
       const total = Math.round((amount + tax) * 100) / 100;
-      const seq = String(++count).padStart(4, '0');
+      const invoiceNum = `${prefix}-${String(++seq).padStart(4, '0')}`;
 
-      db.prepare(`INSERT INTO invoices (client_id, service_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-        svc.client_id, svc.id, `${prefix}-${seq}`, periodStart, periodEnd, amount, tax, total, dueDate
-      );
-      console.log(`[CRON] Invoice: ${svc.first_name} ${svc.last_name} - ${total}`);
+      try {
+        db.prepare(`INSERT INTO invoices (client_id, service_id, invoice_number, period_start, period_end, amount, tax, total, due_date)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          svc.client_id, svc.id, invoiceNum, periodStart, periodEnd, amount, tax, total, dueDate
+        );
+        count++;
+        console.log(`[CRON] Invoice ${invoiceNum}: ${svc.first_name} ${svc.last_name} - ${total}`);
+      } catch (err) {
+        console.error(`[CRON] Error generating invoice for ${svc.first_name} ${svc.last_name}: ${err.message}`);
+      }
     }
     console.log(`[CRON] ${count} invoices generated`);
   });
