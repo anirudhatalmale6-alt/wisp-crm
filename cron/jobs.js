@@ -43,6 +43,14 @@ module.exports = function(db) {
       // Generate if billing day has passed (or is today) and no invoice exists yet
       if (effectiveBillingDay > today) continue;
 
+      // Skip if client was installed AFTER this month's billing day (first invoice next month)
+      if (svc.installation_date) {
+        const instDate = new Date(svc.installation_date);
+        if (instDate.getFullYear() === year && instDate.getMonth() === month && instDate.getDate() > effectiveBillingDay) {
+          continue;
+        }
+      }
+
       const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const periodEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
       const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(effectiveBillingDay).padStart(2, '0')}`;
@@ -57,15 +65,6 @@ module.exports = function(db) {
       }
 
       let amount = svc.price;
-      const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
-
-      if (!prevInvoice && svc.installation_date) {
-        const instDate = new Date(svc.installation_date);
-        const msPerDay = 24 * 60 * 60 * 1000;
-        const daysUsed = Math.round((now.getTime() - instDate.getTime()) / msPerDay);
-
-        if (daysUsed > 0 && daysUsed < lastDay) {
-          amount = Math.round((svc.price / lastDay) * daysUsed * 100) / 100;
           console.log(`[CRON] Proration: ${svc.first_name} ${svc.last_name} - ${daysUsed} dias de ${lastDay} = ${amount}`);
         }
       }

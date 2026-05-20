@@ -66,6 +66,14 @@ module.exports = function(db) {
       const dueDay = Math.min(svc.billing_day || 1, lastDay);
       const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
 
+      // Skip if client was installed AFTER this month's billing day (first invoice next month)
+      if (svc.installation_date) {
+        const instDate = new Date(svc.installation_date);
+        if (instDate.getFullYear() === year && instDate.getMonth() === month && instDate.getDate() > dueDay) {
+          continue;
+        }
+      }
+
       // Check if invoice already exists (by service_id or by client_id for older invoices)
       const existingByService = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
       if (existingByService) continue;

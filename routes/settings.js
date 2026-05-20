@@ -34,14 +34,16 @@ module.exports = function(db) {
 
   // Update WhatsApp settings
   router.post('/whatsapp', (req, res) => {
-    const fields = ['whatsapp_enabled', 'whatsapp_phone_id', 'whatsapp_token'];
+    const fields = ['whatsapp_phone_id', 'whatsapp_token'];
     const update = db.prepare('INSERT OR REPLACE INTO settings (key, value, description) VALUES (?, ?, ?)');
+    // Checkbox: unchecked = not in body
+    update.run('whatsapp_enabled', req.body.whatsapp_enabled ? '1' : '0', 'whatsapp enabled');
     for (const key of fields) {
       if (req.body[key] !== undefined) {
         update.run(key, req.body[key], key.replace(/_/g, ' '));
       }
     }
-    req.session.success = 'Configuración WhatsApp actualizada';
+    req.session.success = 'Configuracion WhatsApp actualizada';
     res.redirect('/settings');
   });
 
