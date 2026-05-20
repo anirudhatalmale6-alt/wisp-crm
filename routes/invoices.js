@@ -66,15 +66,13 @@ module.exports = function(db) {
       const dueDay = Math.min(svc.billing_day || 1, lastDay);
       const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
 
-      const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
-      if (existing) continue;
-      // Fallback: check by client_id for single-service clients
-      if (!existing) {
-        const svcCount = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(svc.client_id).count;
-        if (svcCount === 1) {
-          const existingByClient = db.prepare('SELECT id FROM invoices WHERE client_id = ? AND period_start = ? AND service_id IS NULL').get(svc.client_id, periodStart);
-          if (existingByClient) continue;
-        }
+      // Check if invoice already exists (by service_id or by client_id for older invoices)
+      const existingByService = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
+      if (existingByService) continue;
+      const svcCount = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(svc.client_id).count;
+      if (svcCount <= 1) {
+        const existingByClient = db.prepare('SELECT id FROM invoices WHERE client_id = ? AND period_start = ?').get(svc.client_id, periodStart);
+        if (existingByClient) continue;
       }
 
       let amount = svc.price;
@@ -117,6 +115,41 @@ module.exports = function(db) {
       ? `${generated} facturas generadas (${autoPaid} pagadas automaticamente desde saldo a favor)`
       : `${generated} facturas generadas`;
     req.session.success = msg;
+    res.redirect('/invoices');
+  });
+
+  // Remove duplicate invoices for the current month (admin only)
+  router.post('/remove-duplicates', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos';
+      return res.redirect('/invoices');
+    }
+    const now = new Date();
+    const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+    // Find clients with more than one invoice this month
+    const duplicates = db.prepare(`
+      SELECT client_id, COUNT(*) as cnt FROM invoices
+      WHERE period_start = ? AND status = 'pending'
+      GROUP BY client_id HAVING cnt > 1
+    `).all(periodStart);
+
+    let removed = 0;
+    for (const dup of duplicates) {
+      // Keep the oldest invoice (lowest id), remove the rest
+      const invoices = db.prepare(`
+        SELECT id FROM invoices WHERE client_id = ? AND period_start = ? AND status = 'pending' ORDER BY id ASC
+      `).all(dup.client_id, periodStart);
+
+      for (let i = 1; i < invoices.length; i++) {
+        db.prepare('DELETE FROM invoices WHERE id = ?').run(invoices[i].id);
+        removed++;
+      }
+    }
+
+    req.session.success = removed > 0
+      ? `${removed} facturas duplicadas eliminadas`
+      : 'No se encontraron facturas duplicadas';
     res.redirect('/invoices');
   });
 

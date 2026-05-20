@@ -47,8 +47,14 @@ module.exports = function(db) {
       const periodEnd = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
       const dueDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(effectiveBillingDay).padStart(2, '0')}`;
 
-      const existing = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
-      if (existing) continue;
+      // Check if invoice already exists (by service_id or by client_id for older invoices)
+      const existingByService = db.prepare('SELECT id FROM invoices WHERE service_id = ? AND period_start = ?').get(svc.id, periodStart);
+      if (existingByService) continue;
+      const svcCount = db.prepare('SELECT COUNT(*) as count FROM client_services WHERE client_id = ?').get(svc.client_id).count;
+      if (svcCount <= 1) {
+        const existingByClient = db.prepare('SELECT id FROM invoices WHERE client_id = ? AND period_start = ?').get(svc.client_id, periodStart);
+        if (existingByClient) continue;
+      }
 
       let amount = svc.price;
       const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
