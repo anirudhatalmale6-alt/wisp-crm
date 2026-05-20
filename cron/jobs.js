@@ -65,6 +65,15 @@ module.exports = function(db) {
       }
 
       let amount = svc.price;
+      const prevInvoice = db.prepare('SELECT id FROM invoices WHERE service_id = ?').get(svc.id);
+
+      if (!prevInvoice && svc.installation_date) {
+        const instDate = new Date(svc.installation_date);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUsed = Math.round((now.getTime() - instDate.getTime()) / msPerDay);
+
+        if (daysUsed > 0 && daysUsed < lastDay) {
+          amount = Math.round((svc.price / lastDay) * daysUsed * 100) / 100;
           console.log(`[CRON] Proration: ${svc.first_name} ${svc.last_name} - ${daysUsed} dias de ${lastDay} = ${amount}`);
         }
       }
