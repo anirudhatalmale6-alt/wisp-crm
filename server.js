@@ -113,6 +113,15 @@ app.use('/whatsapp', requireAuth, whatsappRoutes);
 app.use('/settings', requireAuth, requireAdmin, settingsRoutes);
 app.use('/users', requireAuth, requireAdmin, usersRoutes);
 app.use('/onu', requireAuth, onuRoutes);
+
+// Client map
+app.get('/map', requireAuth, (req, res) => {
+  const clients = db.prepare(`SELECT c.*, COALESCE(p.name, '') as plan_name
+    FROM clients c LEFT JOIN plans p ON c.plan_id = p.id
+    ORDER BY c.first_name, c.last_name`).all();
+  res.render('map', { clients, currentPage: 'map' });
+});
+
 // MikroTik routes - API endpoints skip auth, web pages require auth
 app.use('/mikrotik', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();

@@ -1,0 +1,139 @@
+<%- include('partials/header', { currentPage: 'map' }) %>
+
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+  <div class="flex items-center justify-between p-4 pb-2">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-map-marked-alt text-wisp-600 mr-2"></i>Mapa de Clientes</h1>
+      <p class="text-gray-500 text-sm mt-1"><%= clients.filter(c => c.latitude && c.longitude).length %> de <%= clients.length %> clientes con ubicacion</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="statusFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500">
+        <option value="all">Todos los estados</option>
+        <option value="active">Activos</option>
+        <option value="suspended">Suspendidos</option>
+        <option value="inactive">Inactivos</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map" class="flex-1 m-4 mt-2 rounded-xl shadow-lg border border-gray-200" style="min-height: 500px;"></div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<style>
+  .client-popup { min-width: 200px; }
+  .client-popup .name { font-weight: 700; font-size: 14px; color: #1f2937; margin-bottom: 4px; }
+  .client-popup .info { font-size: 12px; color: #6b7280; line-height: 1.6; }
+  .client-popup .info i { width: 16px; text-align: center; margin-right: 4px; }
+  .client-popup .btn { display: inline-block; margin-top: 8px; padding: 4px 12px; background: #0d7377; color: #fff; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; }
+  .client-popup .btn:hover { background: #0a5c5f; }
+  .status-active { color: #059669; }
+  .status-suspended { color: #dc2626; }
+  .status-inactive { color: #6b7280; }
+  .custom-marker-active { background: #059669; border: 2px solid #fff; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .custom-marker-suspended { background: #dc2626; border: 2px solid #fff; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .custom-marker-inactive { background: #6b7280; border: 2px solid #fff; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+</style>
+
+<script>
+  const allClients = <%- JSON.stringify(clients.filter(c => c.latitude && c.longitude).map(c => ({
+    id: c.id,
+    name: c.first_name + ' ' + c.last_name,
+    lat: c.latitude,
+    lng: c.longitude,
+    phone: c.phone || '',
+    address: c.address || '',
+    status: c.status || 'active',
+    plan: c.plan_name || '',
+    pppoe: c.pppoe_user || ''
+  }))) %>;
+
+  const map = L.map('map').setView([19.0, -70.0], 9);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const markerColors = {
+    active: '#059669',
+    suspended: '#dc2626',
+    inactive: '#6b7280'
+  };
+
+  const statusLabels = {
+    active: 'Activo',
+    suspended: 'Suspendido',
+    inactive: 'Inactivo'
+  };
+
+  function createIcon(status) {
+    return L.divIcon({
+      className: '',
+      html: '<div style="background:' + (markerColors[status] || markerColors.active) + ';border:2px solid #fff;border-radius:50%;width:14px;height:14px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+      popupAnchor: [0, -10]
+    });
+  }
+
+  let markers = L.markerClusterGroup({ maxClusterRadius: 40 });
+
+  function renderMarkers(filter) {
+    markers.clearLayers();
+    const filtered = filter === 'all' ? allClients : allClients.filter(c => c.status === filter);
+
+    filtered.forEach(c => {
+      const statusLabel = statusLabels[c.status] || c.status;
+      const statusClass = 'status-' + c.status;
+      const popup = '<div class="client-popup">' +
+        '<div class="name">' + c.name + '</div>' +
+        '<div class="info">' +
+          (c.plan ? '<div><i class="fas fa-cube"></i>' + c.plan + '</div>' : '') +
+          (c.pppoe ? '<div><i class="fas fa-network-wired"></i>' + c.pppoe + '</div>' : '') +
+          (c.phone ? '<div><i class="fas fa-phone"></i>' + c.phone + '</div>' : '') +
+          (c.address ? '<div><i class="fas fa-map-marker-alt"></i>' + c.address + '</div>' : '') +
+          '<div><i class="fas fa-circle ' + statusClass + '"></i><span class="' + statusClass + '">' + statusLabel + '</span></div>' +
+        '</div>' +
+        '<a href="/clients/' + c.id + '" class="btn"><i class="fas fa-user"></i> Ver Cliente</a>' +
+      '</div>';
+
+      L.marker([c.lat, c.lng], { icon: createIcon(c.status) })
+        .bindPopup(popup)
+        .addTo(markers);
+    });
+
+    map.addLayer(markers);
+
+    if (filtered.length > 0) {
+      const bounds = L.latLngBounds(filtered.map(c => [c.lat, c.lng]));
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
+  }
+
+  renderMarkers('all');
+
+  document.getElementById('statusFilter').addEventListener('change', function() {
+    renderMarkers(this.value);
+  });
+
+  // Legend
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function() {
+    const div = L.DomUtil.create('div', '');
+    div.style.cssText = 'background:#fff;padding:8px 12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:12px;line-height:1.8;';
+    div.innerHTML = '<div style="font-weight:700;margin-bottom:2px;">Estado</div>' +
+      '<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#059669;margin-right:6px;"></span>Activo</div>' +
+      '<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;margin-right:6px;"></span>Suspendido</div>' +
+      '<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6b7280;margin-right:6px;"></span>Inactivo</div>';
+    return div;
+  };
+  legend.addTo(map);
+</script>
+
+<%- include('partials/footer') %>
