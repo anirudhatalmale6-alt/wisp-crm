@@ -43,12 +43,10 @@ module.exports = function(db) {
       // Generate if billing day has passed (or is today) and no invoice exists yet
       if (effectiveBillingDay > today) continue;
 
-      // Skip if client was installed AFTER this month's billing day (first invoice next month)
-      if (svc.installation_date) {
-        const instDate = new Date(svc.installation_date);
-        if (instDate.getFullYear() === year && instDate.getMonth() === month && instDate.getDate() > effectiveBillingDay) {
-          continue;
-        }
+      // Skip if client was added AFTER this month's billing day (first invoice next month)
+      const refDate = new Date(svc.installation_date || svc.created_at);
+      if (refDate.getFullYear() === year && refDate.getMonth() === month && refDate.getDate() > effectiveBillingDay) {
+        continue;
       }
 
       const periodStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
