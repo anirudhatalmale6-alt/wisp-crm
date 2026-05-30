@@ -883,5 +883,259 @@ module.exports = function(db) {
     }
   });
 
+  // ========== HSGQ OLT Web API Integration ==========
+
+  let oltSession = null;
+
+  async function oltLogin(host, user, pass) {
+    const baseUrl = `http://${host}`;
+    // Try Basic Auth first (common for HSGQ)
+    try {
+      const resp = await axios.get(`${baseUrl}/gponont_mgmt?form=ont_display_num`, {
+        auth: { username: user, password: pass },
+        timeout: 8000,
+        maxRedirects: 0,
+        validateStatus: s => s < 400
+      });
+      if (resp.status === 200) {
+        oltSession = { method: 'basic', user, pass };
+        return { success: true, method: 'basic' };
+      }
+    } catch (e) {}
+
+    // Try form-based login
+    const loginPaths = ['/login', '/api/login', '/cgi-bin/login'];
+    for (const path of loginPaths) {
+      try {
+        const resp = await axios.post(`${baseUrl}${path}`, `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 8000,
+          maxRedirects: 0,
+          validateStatus: s => s < 400
+        });
+        if (resp.headers['set-cookie'] || (resp.data && !resp.data.error)) {
+          const cookies = resp.headers['set-cookie'] ? resp.headers['set-cookie'].map(c => c.split(';')[0]).join('; ') : '';
+          oltSession = { method: 'cookie', cookies, token: resp.data && resp.data.token ? resp.data.token : null };
+          return { success: true, method: 'cookie' };
+        }
+      } catch (e) {}
+    }
+
+    // Try JSON login
+    for (const path of loginPaths) {
+      try {
+        const resp = await axios.post(`${baseUrl}${path}`, { username: user, password: pass }, {
+          timeout: 8000,
+          maxRedirects: 0,
+          validateStatus: s => s < 400
+        });
+        if (resp.data && (resp.data.token || resp.data.success || resp.headers['set-cookie'])) {
+          const cookies = resp.headers['set-cookie'] ? resp.headers['set-cookie'].map(c => c.split(';')[0]).join('; ') : '';
+          oltSession = { method: 'cookie', cookies, token: resp.data.token || null };
+          return { success: true, method: 'cookie' };
+        }
+      } catch (e) {}
+    }
+
+    // Try no auth (some OLTs allow local access without auth)
+    try {
+      const resp = await axios.get(`${baseUrl}/gponont_mgmt?form=ont_display_num`, {
+        timeout: 8000,
+        validateStatus: s => s < 400
+      });
+      if (resp.status === 200 && resp.data) {
+        oltSession = { method: 'none' };
+        return { success: true, method: 'none' };
+      }
+    } catch (e) {}
+
+    return { success: false, error: 'No se pudo autenticar con la OLT web' };
+  }
+
+  async function oltRequest(host, path, params, method, body) {
+    const settings = getSettings();
+    const user = settings.olt_web_user || settings.olt_user || 'root';
+    const pass = settings.olt_web_pass || settings.olt_pass || '';
+
+    if (!oltSession) {
+      const login = await oltLogin(host, user, pass);
+      if (!login.success) throw new Error(login.error);
+    }
+
+    const baseUrl = `http://${host}`;
+    const config = { timeout: 10000, validateStatus: s => s < 500 };
+
+    if (oltSession.method === 'basic') {
+      config.auth = { username: user, password: pass };
+    } else if (oltSession.method === 'cookie') {
+      config.headers = {};
+      if (oltSession.cookies) config.headers['Cookie'] = oltSession.cookies;
+      if (oltSession.token) config.headers['Authorization'] = `Bearer ${oltSession.token}`;
+    }
+
+    let resp;
+    if (method === 'POST') {
+      if (typeof body === 'string') {
+        config.headers = config.headers || {};
+        config.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        resp = await axios.post(`${baseUrl}${path}`, body, config);
+      } else {
+        resp = await axios.post(`${baseUrl}${path}`, body, config);
+      }
+    } else {
+      const qs = params ? '?' + Object.entries(params).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&') : '';
+      resp = await axios.get(`${baseUrl}${path}${qs}`, config);
+    }
+
+    // If 401/403, retry with fresh login
+    if (resp.status === 401 || resp.status === 403) {
+      oltSession = null;
+      const login = await oltLogin(host, user, pass);
+      if (!login.success) throw new Error('Sesion expirada, no se pudo reautenticar');
+      return oltRequest(host, path, params, method, body);
+    }
+
+    return resp.data;
+  }
+
+  // API: Test OLT web connection
+  router.get('/api/olt/test', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ success: false, error: 'OLT no configurada' });
+
+    const user = settings.olt_web_user || settings.olt_user || 'root';
+    const pass = settings.olt_web_pass || settings.olt_pass || '';
+
+    try {
+      oltSession = null;
+      const login = await oltLogin(settings.olt_host, user, pass);
+      res.json({ success: login.success, method: login.method, error: login.error || null });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // API: Read WiFi config from OLT for a PON port
+  router.get('/api/olt/wlan', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ error: 'OLT no configurada' });
+
+    const portId = req.query.port_id || '0';
+    try {
+      const data = await oltRequest(settings.olt_host, '/gponont_mgmt', { form: 'wificonfig', port_id: portId });
+      res.json({ data, error: null });
+    } catch (e) {
+      res.json({ data: null, error: e.message });
+    }
+  });
+
+  // API: Set WiFi config on a specific ONU via OLT web
+  router.post('/api/olt/wlan', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ success: false, error: 'OLT no configurada' });
+
+    const { port_id, ont_id, ssid, share_key } = req.body;
+    if (!ssid) return res.json({ success: false, error: 'SSID requerido' });
+
+    const params = {
+      form: 'wificonfig_set',
+      port_id: port_id || '0',
+      ont_id: ont_id || '0',
+      instance: '1',
+      status: 'Enable',
+      ssid: ssid,
+      security_mode: 'wpa2mixed',
+      wpaencrypt: 'TKIP/AES',
+      share_key: share_key || '',
+      channel: 'Auto',
+      band_width: '40MHz',
+      beacon: '100',
+      dtim: '1',
+      shortgi: 'Enable',
+      isolation: 'Disable',
+      broadcast: 'Enable'
+    };
+
+    try {
+      // Try POST first (more common for write operations)
+      let data;
+      const formBody = Object.entries(params).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+      try {
+        data = await oltRequest(settings.olt_host, '/gponont_mgmt', null, 'POST', formBody);
+      } catch (e) {
+        // Fallback: try GET with params
+        data = await oltRequest(settings.olt_host, '/gponont_mgmt', params);
+      }
+      res.json({ success: true, data, error: null });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // API: Read WAN config from OLT for a PON port
+  router.get('/api/olt/wan', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ error: 'OLT no configurada' });
+
+    const portId = req.query.port_id || '0';
+    try {
+      const data = await oltRequest(settings.olt_host, '/gponont_mgmt', { form: 'wanconfig', port_id: portId });
+      res.json({ data, error: null });
+    } catch (e) {
+      res.json({ data: null, error: e.message });
+    }
+  });
+
+  // API: Set WAN/PPPoE config on a specific ONU via OLT web
+  router.post('/api/olt/wan', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ success: false, error: 'OLT no configurada' });
+
+    const { port_id, ont_id, pppoe_user, pppoe_pass, vlan_id, connection_type } = req.body;
+    if (!pppoe_user) return res.json({ success: false, error: 'Usuario PPPoE requerido' });
+
+    const params = {
+      form: 'wanconfig_set',
+      port_id: port_id || '0',
+      ont_id: ont_id || '0',
+      name: 'WAN1',
+      channel_mode: 'pppoe',
+      connection_type: connection_type || 'internet',
+      enable_vlan: vlan_id ? '1' : '0',
+      vlan_id: vlan_id || '',
+      vlan_priority: '0',
+      user: pppoe_user,
+      password: pppoe_pass || '',
+      port_mapping: 'LAN1,LAN2,LAN3,LAN4,WLAN0,WLAN1'
+    };
+
+    try {
+      let data;
+      const formBody = Object.entries(params).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+      try {
+        data = await oltRequest(settings.olt_host, '/gponont_mgmt', null, 'POST', formBody);
+      } catch (e) {
+        data = await oltRequest(settings.olt_host, '/gponont_mgmt', params);
+      }
+      res.json({ success: true, data, error: null });
+    } catch (e) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // API: Raw OLT web request (for debugging API discovery)
+  router.get('/api/olt/raw', async (req, res) => {
+    const settings = getSettings();
+    if (!settings.olt_host) return res.json({ error: 'OLT no configurada' });
+
+    const params = { ...req.query };
+    try {
+      const data = await oltRequest(settings.olt_host, '/gponont_mgmt', params);
+      res.json({ data, error: null });
+    } catch (e) {
+      res.json({ data: null, error: e.message });
+    }
+  });
+
   return router;
 };
