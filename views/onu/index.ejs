@@ -57,10 +57,37 @@
   </div>
 </div>
 
+<!-- New/Unassigned ONUs Section -->
+<div id="snmp-new" class="hidden mb-6">
+  <div class="bg-orange-50 rounded-xl shadow-sm border border-orange-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-orange-200 bg-orange-100 flex items-center justify-between">
+      <h3 class="font-semibold text-orange-800"><i class="fas fa-star text-orange-500 mr-2"></i>ONUs Nuevas / Sin Asignar <span id="new-count" class="text-sm font-normal text-orange-600"></span></h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-orange-600 border-b border-orange-200 bg-orange-50">
+            <th class="px-3 py-3 font-medium">PON</th>
+            <th class="px-3 py-3 font-medium">ONU ID</th>
+            <th class="px-3 py-3 font-medium">Serial</th>
+            <th class="px-3 py-3 font-medium">Modelo</th>
+            <th class="px-3 py-3 font-medium">RX Power</th>
+            <th class="px-3 py-3 font-medium">Ultima Conexion</th>
+            <th class="px-3 py-3 font-medium">Estado</th>
+            <th class="px-3 py-3 font-medium text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="snmp-new-tbody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- SNMP ONU Table -->
 <div id="snmp-table" class="hidden bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
   <div class="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
-    <h3 class="font-semibold text-gray-700"><i class="fas fa-broadcast-tower text-purple-500 mr-2"></i>ONUs Detectadas via SNMP</h3>
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-broadcast-tower text-purple-500 mr-2"></i>ONUs Asignadas <span id="assigned-count" class="text-sm font-normal text-gray-500"></span></h3>
     <div class="flex items-center gap-2">
       <input type="text" id="snmp-search" onkeyup="filterOnuTable()" placeholder="Buscar serial, modelo, cliente..."
         class="text-xs border border-gray-300 rounded-lg px-2 py-1 w-48">
@@ -376,6 +403,8 @@ async function snmpDiscover() {
     document.getElementById('snmp-stats').classList.remove('hidden');
 
     renderOnuTable(allOnus);
+    renderNewOnus(allOnus);
+    document.getElementById('assigned-count').textContent = '(' + allOnus.filter(function(o) { return o.assigned; }).length + ')';
     document.getElementById('snmp-table').classList.remove('hidden');
 
   } catch (e) {
@@ -438,6 +467,66 @@ function renderOnuTable(onus) {
     html += '</tr>';
   });
   tbody.innerHTML = html;
+}
+
+function renderNewOnus(onus) {
+  var unassigned = onus.filter(function(o) { return !o.assigned; });
+  var section = document.getElementById('snmp-new');
+
+  if (unassigned.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  // Sort by lastSeen descending (newest first)
+  unassigned.sort(function(a, b) {
+    if (!a.lastSeen && !b.lastSeen) return 0;
+    if (!a.lastSeen) return 1;
+    if (!b.lastSeen) return -1;
+    return b.lastSeen.localeCompare(a.lastSeen);
+  });
+
+  document.getElementById('new-count').textContent = '(' + unassigned.length + ')';
+  var tbody = document.getElementById('snmp-new-tbody');
+  var html = '';
+
+  unassigned.forEach(function(onu) {
+    var rxClass = '';
+    if (onu.rxDbm !== null && onu.rxDbm !== undefined) {
+      if (onu.rxDbm > -25) rxClass = 'text-green-600 font-semibold';
+      else if (onu.rxDbm > -28) rxClass = 'text-yellow-600 font-semibold';
+      else rxClass = 'text-red-600 font-semibold';
+    }
+
+    var modelStr = onu.model || '';
+    if (onu.vendor && onu.vendor !== onu.model) modelStr = (onu.vendor + ' ' + modelStr).trim();
+
+    html += '<tr class="border-b border-orange-100 hover:bg-orange-50">';
+    html += '<td class="px-3 py-2.5 font-mono text-xs">' + (onu.ponPort || '-') + '</td>';
+    html += '<td class="px-3 py-2.5 font-mono text-xs">' + (onu.onuId || '-') + '</td>';
+    html += '<td class="px-3 py-2.5 font-mono text-xs font-semibold text-orange-700">' + (onu.serial || '-') + '</td>';
+    html += '<td class="px-3 py-2.5 text-xs text-gray-600">' + (modelStr || '-') + '</td>';
+    html += '<td class="px-3 py-2.5 font-mono text-xs ' + rxClass + '">' + (onu.rxPower || '-') + '</td>';
+    html += '<td class="px-3 py-2.5 text-xs text-gray-500">' + (onu.lastSeen || '-') + '</td>';
+    html += '<td class="px-3 py-2.5">';
+    if (onu.status === 'online') {
+      html += '<span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Online</span>';
+    } else {
+      html += '<span class="inline-flex items-center gap-1 bg-red-100 text-red-600 text-xs font-medium px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 bg-red-400 rounded-full"></span>Offline</span>';
+    }
+    html += '</td>';
+    html += '<td class="px-3 py-2.5 text-center">';
+    html += '<div class="flex items-center justify-center gap-1">';
+    html += '<button onclick="openConfig(\'' + onu.serial + '\', \'' + (onu.onuId || '') + '\', ' + (onu.ponPort || 0) + ', \'' + (onu.index || '') + '\')" class="text-purple-500 hover:text-purple-700 p-1" title="Configurar WiFi/PPPoE"><i class="fas fa-cog text-xs"></i></button>';
+    html += '<button onclick="openAssign(\'' + onu.serial + '\')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium"><i class="fas fa-link mr-1"></i>Asignar</button>';
+    html += '<button onclick="rebootOnu(\'' + onu.index + '\', \'' + onu.serial + '\')" class="text-orange-500 hover:text-orange-700 p-1" title="Reiniciar ONU"><i class="fas fa-sync-alt text-xs"></i></button>';
+    html += '</div>';
+    html += '</td>';
+    html += '</tr>';
+  });
+
+  tbody.innerHTML = html;
+  section.classList.remove('hidden');
 }
 
 function filterOnuTable() {
