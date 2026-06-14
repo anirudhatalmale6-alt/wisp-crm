@@ -19,19 +19,16 @@
       </h3>
     </div>
     <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Client -->
-      <div>
-        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1">Cliente <span class="text-red-500">*</span></label>
-        <select id="client_id" name="client_id" required
+      <!-- Client (searchable) -->
+      <div class="relative">
+        <label for="client_search" class="block text-sm font-medium text-gray-700 mb-1">Cliente <span class="text-red-500">*</span></label>
+        <input type="hidden" id="client_id" name="client_id" required value="<%= (typeof clientId !== 'undefined' && clientId) ? clientId : '' %>">
+        <input type="text" id="client_search" autocomplete="off"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
-          onchange="loadClientInvoices()">
-          <option value="">Seleccionar cliente...</option>
-          <% clients.forEach(c => { %>
-            <option value="<%= c.id %>" <%= (typeof clientId !== 'undefined' && String(clientId) === String(c.id)) ? 'selected' : '' %>>
-              <%= c.first_name %> <%= c.last_name %> - <%= c.phone %>
-            </option>
-          <% }) %>
-        </select>
+          placeholder="Escriba el nombre o telefono del cliente..."
+          onfocus="showPayClientDropdown()" oninput="filterPayClients()">
+        <div id="pay_client_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        </div>
       </div>
 
       <!-- Invoice -->
@@ -154,6 +151,67 @@ function updateAmount() {
     amountInput.value = Number(selectedOption.dataset.amount).toFixed(2);
   }
 }
+
+// Searchable client dropdown
+const payClients = [
+  <% clients.forEach(c => { %>
+  { id: <%= c.id %>, name: '<%= c.first_name.replace(/'/g, "\\'") %> <%= c.last_name.replace(/'/g, "\\'") %>', phone: '<%= (c.phone || '').replace(/'/g, "\\'") %>' },
+  <% }) %>
+];
+
+const paySearchInput = document.getElementById('client_search');
+const payHiddenInput = document.getElementById('client_id');
+const payDropdown = document.getElementById('pay_client_dropdown');
+
+// Pre-fill if preselected
+<% if (typeof clientId !== 'undefined' && clientId) { %>
+const payPresel = payClients.find(c => c.id === <%= clientId %>);
+if (payPresel) paySearchInput.value = payPresel.name + ' - ' + payPresel.phone;
+<% } %>
+
+function renderPayDropdown(list) {
+  payDropdown.innerHTML = '';
+  if (list.length === 0) {
+    payDropdown.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">No se encontraron clientes</div>';
+    return;
+  }
+  list.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'px-3 py-2 text-sm hover:bg-wisp-50 cursor-pointer border-b border-gray-100 last:border-0';
+    div.textContent = c.name + ' - ' + c.phone;
+    div.onclick = function() {
+      payHiddenInput.value = c.id;
+      paySearchInput.value = c.name + ' - ' + c.phone;
+      payDropdown.classList.add('hidden');
+      loadClientInvoices();
+    };
+    payDropdown.appendChild(div);
+  });
+}
+
+function filterPayClients() {
+  const q = paySearchInput.value.toLowerCase().trim();
+  payHiddenInput.value = '';
+  if (!q) {
+    renderPayDropdown(payClients.slice(0, 20));
+  } else {
+    const filtered = payClients.filter(c =>
+      c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+    );
+    renderPayDropdown(filtered.slice(0, 20));
+  }
+  payDropdown.classList.remove('hidden');
+}
+
+function showPayClientDropdown() {
+  filterPayClients();
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#client_search') && !e.target.closest('#pay_client_dropdown')) {
+    payDropdown.classList.add('hidden');
+  }
+});
 
 // Initialize on page load if client is pre-selected
 <% if (typeof clientId !== 'undefined' && clientId) { %>

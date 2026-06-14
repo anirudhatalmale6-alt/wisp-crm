@@ -109,6 +109,56 @@
   <% } %>
 </div>
 
+<!-- New Clients This Month (toggleable) -->
+<div id="newClientsList" class="hidden bg-white rounded-xl shadow-sm border mb-6 overflow-hidden">
+  <div class="px-5 py-4 border-b bg-teal-50 flex items-center justify-between">
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-user-plus text-teal-500 mr-2"></i>Clientes Nuevos Este Mes (<%= newClientsMonthList.length %>)</h3>
+    <button onclick="document.getElementById('newClientsList').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+  </div>
+  <% if (newClientsMonthList.length === 0) { %>
+    <div class="p-5 text-center text-gray-400 text-sm">No hay clientes nuevos este mes</div>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b text-left">
+            <th class="px-4 py-3 font-semibold text-gray-600">Cliente</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Telefono</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Plan</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Fecha Registro</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Estado</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% newClientsMonthList.forEach(c => { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <a href="/clients/<%= c.id %>" class="font-medium text-gray-800 hover:text-wisp-600"><%= c.first_name %> <%= c.last_name %></a>
+            </td>
+            <td class="px-4 py-3 text-gray-600"><%= c.phone %></td>
+            <td class="px-4 py-3 text-gray-600"><%= c.plan_name || 'Sin plan' %></td>
+            <td class="px-4 py-3 text-gray-600"><%= c.created_at ? c.created_at.substring(0, 10) : '' %></td>
+            <td class="px-4 py-3 text-center">
+              <% if (c.status === 'active') { %>
+                <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Activo</span>
+              <% } else if (c.status === 'suspended') { %>
+                <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Suspendido</span>
+              <% } else { %>
+                <span class="bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full"><%= c.status %></span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <a href="/clients/<%= c.id %>" class="text-wisp-600 hover:text-wisp-700 text-sm font-medium"><i class="fas fa-eye mr-1"></i>Ver</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
 <!-- Stats Cards Row 2 -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
   <a href="/payments" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer block">
@@ -135,7 +185,7 @@
     </div>
   </a>
 
-  <div class="bg-white rounded-xl shadow-sm border p-5">
+  <a href="#" onclick="document.getElementById('newClientsList').classList.toggle('hidden');return false;" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-teal-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>
         <p class="text-sm text-gray-500">Nuevos Este Mes</p>
@@ -145,7 +195,10 @@
         <i class="fas fa-user-plus text-teal-600 text-xl"></i>
       </div>
     </div>
-  </div>
+    <div class="mt-2 text-xs text-gray-500">
+      <span class="text-teal-500"><i class="fas fa-chevron-down"></i> Ver clientes</span>
+    </div>
+  </a>
 </div>
 
 <!-- Quick Actions -->

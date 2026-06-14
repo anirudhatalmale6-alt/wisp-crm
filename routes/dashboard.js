@@ -32,6 +32,15 @@ module.exports = function(db) {
       "SELECT COUNT(*) as count FROM clients WHERE created_at >= ? AND created_at <= ?"
     ).get(monthStart, monthEnd + ' 23:59:59').count;
 
+    const newClientsMonthList = db.prepare(`
+      SELECT c.id, c.first_name, c.last_name, c.phone, c.status, c.created_at,
+             p.name as plan_name
+      FROM clients c
+      LEFT JOIN plans p ON c.plan_id = p.id
+      WHERE c.created_at >= ? AND c.created_at <= ?
+      ORDER BY c.created_at DESC
+    `).all(monthStart, monthEnd + ' 23:59:59');
+
     const pendingInvoices = db.prepare("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending'").get().count;
     const overdueInvoices = db.prepare(
       "SELECT COUNT(*) as count FROM invoices WHERE status = 'pending' AND due_date < date('now')"
@@ -96,7 +105,7 @@ module.exports = function(db) {
     res.render('dashboard', {
       settings,
       totalClients, activeClients, suspendedClients,
-      monthlyIncome, prevMonthIncome, newClientsMonth,
+      monthlyIncome, prevMonthIncome, newClientsMonth, newClientsMonthList,
       pendingInvoices, overdueInvoices, pendingAmount, clientsPendingInvoices,
       recentPayments, overdueClients, planDistribution,
       secretaryPayments, secretaryTotal
