@@ -333,6 +333,67 @@
 </div>
 <% } %>
 
+<!-- Offline Clients (loaded via AJAX from MikroTik) -->
+<div class="bg-white rounded-xl shadow-sm border mt-6" id="offlineSection">
+  <div class="p-5 border-b flex items-center justify-between">
+    <h3 class="font-semibold text-gray-700"><i class="fas fa-wifi text-gray-400 mr-2"></i>Estado de Conexion PPPoE</h3>
+    <div class="flex items-center gap-3">
+      <span id="onlineCount" class="text-sm text-gray-400"></span>
+      <button onclick="loadOfflineClients()" class="text-wisp-600 hover:text-wisp-700 text-sm"><i class="fas fa-sync-alt"></i></button>
+    </div>
+  </div>
+  <div class="p-5" id="offlineContent">
+    <div class="text-center py-4">
+      <i class="fas fa-spinner fa-spin text-gray-300 text-xl"></i>
+      <p class="text-sm text-gray-400 mt-2">Consultando MikroTik...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function loadOfflineClients() {
+  var content = document.getElementById('offlineContent');
+  var countEl = document.getElementById('onlineCount');
+  content.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-gray-300 text-xl"></i><p class="text-sm text-gray-400 mt-2">Consultando MikroTik...</p></div>';
+
+  fetch('/mikrotik/api/offline-clients')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        content.innerHTML = '<p class="text-sm text-gray-400 text-center py-4"><i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>' + data.error + '</p>';
+        return;
+      }
+
+      countEl.innerHTML = '<span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">' + data.online + ' en linea</span> ' +
+        '<span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">' + data.offline.length + ' offline</span> ' +
+        '<span class="text-xs text-gray-400">de ' + data.total + '</span>';
+
+      if (data.offline.length === 0) {
+        content.innerHTML = '<p class="text-sm text-green-600 text-center py-4"><i class="fas fa-check-circle mr-1"></i>Todos los clientes estan conectados</p>';
+        return;
+      }
+
+      var html = '<div class="space-y-2">';
+      data.offline.forEach(function(c) {
+        html += '<div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">' +
+          '<div>' +
+          '<a href="/clients/' + c.id + '" class="font-medium text-sm text-gray-800 hover:text-wisp-600">' + c.first_name + ' ' + c.last_name + '</a>' +
+          '<p class="text-xs text-gray-500">' + (c.phone || '') + (c.plan_name ? ' &middot; ' + c.plan_name : '') + '</p>' +
+          (c.pppoe_user ? '<p class="text-xs text-gray-400">PPPoE: ' + c.pppoe_user + '</p>' : '') +
+          '</div>' +
+          '<span class="bg-red-200 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Offline</span>' +
+          '</div>';
+      });
+      html += '</div>';
+      content.innerHTML = html;
+    })
+    .catch(function(err) {
+      content.innerHTML = '<p class="text-sm text-red-400 text-center py-4">Error al conectar</p>';
+    });
+}
+loadOfflineClients();
+</script>
+
 <!-- Plan Distribution -->
 <div class="bg-white rounded-xl shadow-sm border mt-6">
   <div class="p-5 border-b">
