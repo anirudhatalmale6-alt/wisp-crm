@@ -1,6 +1,4 @@
 const express = require('express');
-const axios = require('axios');
-const { Client } = require('ssh2');
 
 module.exports = function(db) {
   const router = express.Router();
@@ -222,169 +220,75 @@ module.exports = function(db) {
     res.type('text/plain').send(script);
   });
 
-  // GET /mikrotik/api/active-pppoe - Fetch active PPPoE sessions from MikroTik
-  router.get('/api/active-pppoe', async (req, res) => {
-    const settings = getSettings();
-    const host = settings.mikrotik_host;
-    const user = settings.mikrotik_user;
-    const pass = settings.mikrotik_pass;
-
-    if (!host || !user) {
-      return res.json({ error: 'MikroTik no configurado', active: [] });
+  // POST /mikrotik/api/report-active - MikroTik pushes active PPPoE sessions list
+  router.post('/api/report-active', (req, res) => {
+    const { users } = req.body;
+    if (!users || !Array.isArray(users)) {
+      return res.status(400).json({ error: 'Missing users array' });
     }
 
-    // Try REST API first (RouterOS 7+)
-    try {
-      const resp = await axios.get(`http://${host}/rest/ppp/active`, {
-        auth: { username: user, password: pass },
-        timeout: 8000,
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const active = (resp.data || []).map(s => ({
-        name: s.name || s['.id'],
-        address: s.address || '',
-        uptime: s.uptime || '',
-        service: s.service || 'pppoe'
-      }));
-      return res.json({ active, source: 'rest' });
-    } catch(e) {
-      // REST failed, try SSH
-    }
-
-    // Fallback: SSH
-    try {
-      const result = await new Promise((resolve, reject) => {
-        const conn = new Client();
-        let output = '';
-        const timer = setTimeout(() => { conn.end(); reject(new Error('SSH timeout')); }, 10000);
-
-        conn.on('ready', () => {
-          conn.exec('/ppp active print terse', (err, stream) => {
-            if (err) { clearTimeout(timer); conn.end(); return reject(err); }
-            stream.on('data', d => { output += d.toString(); });
-            stream.stderr.on('data', d => { output += d.toString(); });
-            stream.on('close', () => { clearTimeout(timer); conn.end(); resolve(output); });
-          });
-        });
-        conn.on('error', err => { clearTimeout(timer); reject(err); });
-        conn.connect({
-          host: host,
-          port: parseInt(settings.mikrotik_port) === 8728 ? 22 : parseInt(settings.mikrotik_port || '22'),
-          username: user,
-          password: pass,
-          readyTimeout: 8000,
-          algorithms: { kex: ['diffie-hellman-group14-sha1', 'diffie-hellman-group14-sha256', 'diffie-hellman-group-exchange-sha256'] }
-        });
-      });
-
-      const active = [];
-      const lines = result.split('\n');
-      for (const line of lines) {
-        const nameMatch = line.match(/name=(\S+)/);
-        if (nameMatch) {
-          const addrMatch = line.match(/address=(\S+)/);
-          const uptimeMatch = line.match(/uptime=(\S+)/);
-          active.push({
-            name: nameMatch[1],
-            address: addrMatch ? addrMatch[1] : '',
-            uptime: uptimeMatch ? uptimeMatch[1] : ''
-          });
-        }
-      }
-      return res.json({ active, source: 'ssh' });
-    } catch(e) {
-      return res.json({ error: 'No se pudo conectar al MikroTik: ' + e.message, active: [] });
-    }
+    const data = JSON.stringify({ users, timestamp: new Date().toISOString() });
+    db.prepare('INSERT OR REPLACE INTO settings (key, value, description) VALUES (?, ?, ?)').run(
+      'pppoe_active_cache', data, 'Cache de sesiones PPPoE activas reportadas por MikroTik'
+    );
+    res.json({ success: true, count: users.length });
   });
 
-  // GET /mikrotik/api/offline-clients - Compare active PPPoE with CRM clients
-  router.get('/api/offline-clients', async (req, res) => {
-    try {
-      const settings = getSettings();
-      const host = settings.mikrotik_host;
-      const user = settings.mikrotik_user;
-      const pass = settings.mikrotik_pass;
+  // GET /mikrotik/api/offline-clients - Compare cached PPPoE with CRM clients
+  router.get('/api/offline-clients', (req, res) => {
+    const cached = db.prepare("SELECT value FROM settings WHERE key = 'pppoe_active_cache'").get();
 
-      if (!host || !user) {
-        return res.json({ error: 'MikroTik no configurado', offline: [], online: 0, total: 0 });
-      }
-
-      // Get active PPPoE sessions
-      let activeNames = [];
-      let source = '';
-
-      // Try REST API first
-      try {
-        const resp = await axios.get(`http://${host}/rest/ppp/active`, {
-          auth: { username: user, password: pass },
-          timeout: 8000,
-          headers: { 'Content-Type': 'application/json' }
-        });
-        activeNames = (resp.data || []).map(s => (s.name || '').toLowerCase());
-        source = 'rest';
-      } catch(e) {
-        // Try SSH
-        try {
-          const result = await new Promise((resolve, reject) => {
-            const conn = new Client();
-            let output = '';
-            const timer = setTimeout(() => { conn.end(); reject(new Error('timeout')); }, 10000);
-            conn.on('ready', () => {
-              conn.exec('/ppp active print terse', (err, stream) => {
-                if (err) { clearTimeout(timer); conn.end(); return reject(err); }
-                stream.on('data', d => { output += d.toString(); });
-                stream.stderr.on('data', d => { output += d.toString(); });
-                stream.on('close', () => { clearTimeout(timer); conn.end(); resolve(output); });
-              });
-            });
-            conn.on('error', err => { clearTimeout(timer); reject(err); });
-            conn.connect({
-              host: host,
-              port: parseInt(settings.mikrotik_port) === 8728 ? 22 : parseInt(settings.mikrotik_port || '22'),
-              username: user,
-              password: pass,
-              readyTimeout: 8000,
-              algorithms: { kex: ['diffie-hellman-group14-sha1', 'diffie-hellman-group14-sha256', 'diffie-hellman-group-exchange-sha256'] }
-            });
-          });
-          const lines = result.split('\n');
-          for (const line of lines) {
-            const m = line.match(/name=(\S+)/);
-            if (m) activeNames.push(m[1].toLowerCase());
-          }
-          source = 'ssh';
-        } catch(e2) {
-          return res.json({ error: 'No se pudo conectar: ' + e2.message, offline: [], online: 0, total: 0 });
-        }
-      }
-
-      // Get all active clients with PPPoE user from CRM
-      const clients = db.prepare(`
-        SELECT c.id, c.first_name, c.last_name, c.phone, c.address,
-               cs.pppoe_user, p.name as plan_name
-        FROM clients c
-        JOIN client_services cs ON cs.client_id = c.id
-        LEFT JOIN plans p ON cs.plan_id = p.id
-        WHERE c.status = 'active' AND cs.status = 'active'
-          AND cs.pppoe_user IS NOT NULL AND cs.pppoe_user != ''
-      `).all();
-
-      const activeSet = new Set(activeNames);
-      const offline = [];
-      let onlineCount = 0;
-
-      for (const c of clients) {
-        if (activeSet.has(c.pppoe_user.toLowerCase())) {
-          onlineCount++;
-        } else {
-          offline.push(c);
-        }
-      }
-
-      res.json({ offline, online: onlineCount, total: clients.length, source });
-    } catch(e) {
-      res.json({ error: e.message, offline: [], online: 0, total: 0 });
+    if (!cached || !cached.value) {
+      return res.json({ error: 'No hay datos de PPPoE. El MikroTik aun no ha reportado sesiones activas.', offline: [], online: 0, total: 0 });
     }
+
+    let data;
+    try { data = JSON.parse(cached.value); } catch(e) {
+      return res.json({ error: 'Datos corruptos', offline: [], online: 0, total: 0 });
+    }
+
+    const activeSet = new Set((data.users || []).map(u => u.toLowerCase()));
+
+    const clients = db.prepare(`
+      SELECT c.id, c.first_name, c.last_name, c.phone, c.address,
+             cs.pppoe_user, p.name as plan_name
+      FROM clients c
+      JOIN client_services cs ON cs.client_id = c.id
+      LEFT JOIN plans p ON cs.plan_id = p.id
+      WHERE c.status = 'active' AND cs.status = 'active'
+        AND cs.pppoe_user IS NOT NULL AND cs.pppoe_user != ''
+    `).all();
+
+    const offline = [];
+    let onlineCount = 0;
+
+    for (const c of clients) {
+      if (activeSet.has(c.pppoe_user.toLowerCase())) {
+        onlineCount++;
+      } else {
+        offline.push(c);
+      }
+    }
+
+    const age = data.timestamp ? Math.round((Date.now() - new Date(data.timestamp).getTime()) / 60000) : null;
+
+    res.json({ offline, online: onlineCount, total: clients.length, lastUpdate: data.timestamp, ageMinutes: age });
+  });
+
+  // GET /mikrotik/api/report-script - Returns .rsc script that collects active PPPoE and sends to CRM
+  router.get('/api/report-script', (req, res) => {
+    const serverUrl = 'http://192.168.25.3:3000';
+    const script = `:local users ""
+:local sep ""
+:foreach i in=[/ppp active find] do={
+  :local name [/ppp active get $i name]
+  :set users ("$users$sep\\"$name\\"")
+  :set sep ","
+}
+:local payload "{\\\"users\\\":[$users]}"
+/tool fetch url="${serverUrl}/mikrotik/api/report-active" http-method=post http-header-field="Content-Type: application/json" http-data=$payload output=none
+`;
+    res.type('text/plain').send(script);
   });
 
   return router;

@@ -364,9 +364,13 @@ function loadOfflineClients() {
         return;
       }
 
+      var ageText = '';
+      if (data.ageMinutes !== null && data.ageMinutes !== undefined) {
+        ageText = data.ageMinutes < 1 ? ' (hace menos de 1 min)' : ' (hace ' + data.ageMinutes + ' min)';
+      }
       countEl.innerHTML = '<span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">' + data.online + ' en linea</span> ' +
         '<span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">' + data.offline.length + ' offline</span> ' +
-        '<span class="text-xs text-gray-400">de ' + data.total + '</span>';
+        '<span class="text-xs text-gray-400">de ' + data.total + ageText + '</span>';
 
       if (data.offline.length === 0) {
         content.innerHTML = '<p class="text-sm text-green-600 text-center py-4"><i class="fas fa-check-circle mr-1"></i>Todos los clientes estan conectados</p>';
