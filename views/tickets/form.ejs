@@ -1,0 +1,143 @@
+<%- include('../partials/header', { currentPage: 'tickets', pageTitle: ticket ? 'Editar Ticket' : 'Nuevo Ticket' }) %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/tickets" class="hover:text-wisp-600 transition-colors">Tickets</a>
+  <i class="fas fa-chevron-right text-xs"></i>
+  <span class="text-gray-700 font-medium"><%= ticket ? 'Editar Ticket #' + ticket.id : 'Nuevo Ticket' %></span>
+</div>
+
+<form method="POST" action="<%= ticket ? '/tickets/' + ticket.id : '/tickets' %>" class="space-y-6">
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-ticket-alt text-wisp-600"></i> Datos del Ticket
+      </h3>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Client (searchable) -->
+      <div class="md:col-span-2 relative">
+        <label for="tclient_search" class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+        <input type="hidden" id="client_id" name="client_id" value="<%= ticket ? (ticket.client_id || '') : (preselect_client || '') %>">
+        <input type="text" id="tclient_search" autocomplete="off"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Escriba el nombre o telefono del cliente..."
+          onfocus="showTckDropdown()" oninput="filterTckClients()">
+        <div id="tclient_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+      </div>
+
+      <!-- Title -->
+      <div class="md:col-span-2">
+        <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Titulo <span class="text-red-500">*</span></label>
+        <input type="text" id="title" name="title" required value="<%= ticket ? ticket.title : '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Ej: Sin internet, Velocidad lenta, Router danado...">
+      </div>
+
+      <!-- Description -->
+      <div class="md:col-span-2">
+        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
+        <textarea id="description" name="description" rows="3"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none resize-y"
+          placeholder="Detalles del problema..."><%= ticket ? (ticket.description || '') : '' %></textarea>
+      </div>
+
+      <!-- Priority -->
+      <div>
+        <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+        <select id="priority" name="priority"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="baja" <%= ticket && ticket.priority === 'baja' ? 'selected' : '' %>>Baja</option>
+          <option value="media" <%= !ticket || ticket.priority === 'media' ? 'selected' : '' %>>Media</option>
+          <option value="alta" <%= ticket && ticket.priority === 'alta' ? 'selected' : '' %>>Alta</option>
+        </select>
+      </div>
+
+      <!-- Assigned To -->
+      <div>
+        <label for="assigned_to" class="block text-sm font-medium text-gray-700 mb-1">Asignado a (tecnico)</label>
+        <input type="text" id="assigned_to" name="assigned_to" value="<%= ticket ? (ticket.assigned_to || '') : '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Nombre del tecnico">
+      </div>
+
+      <% if (ticket) { %>
+      <!-- Status (only on edit) -->
+      <div>
+        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+        <select id="status" name="status"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none">
+          <option value="abierto" <%= ticket.status === 'abierto' ? 'selected' : '' %>>Abierto</option>
+          <option value="en_progreso" <%= ticket.status === 'en_progreso' ? 'selected' : '' %>>En Progreso</option>
+          <option value="resuelto" <%= ticket.status === 'resuelto' ? 'selected' : '' %>>Resuelto</option>
+        </select>
+      </div>
+
+      <!-- Resolution Notes -->
+      <div>
+        <label for="resolution_notes" class="block text-sm font-medium text-gray-700 mb-1">Notas de resolucion</label>
+        <input type="text" id="resolution_notes" name="resolution_notes" value="<%= ticket.resolution_notes || '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-wisp-500 focus:border-wisp-500 outline-none"
+          placeholder="Como se resolvio el problema">
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center justify-between">
+    <a href="/tickets" class="px-4 py-2.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+      <i class="fas fa-arrow-left mr-1"></i> Cancelar
+    </a>
+    <button type="submit" class="bg-wisp-600 hover:bg-wisp-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <i class="fas fa-save mr-1"></i> <%= ticket ? 'Guardar Cambios' : 'Crear Ticket' %>
+    </button>
+  </div>
+</form>
+
+<script>
+const tckClients = [
+  <% clients.forEach(c => { %>
+  { id: <%= c.id %>, name: '<%= c.first_name.replace(/'/g, "\\'") %> <%= c.last_name.replace(/'/g, "\\'") %>', phone: '<%= (c.phone || '').replace(/'/g, "\\'") %>' },
+  <% }) %>
+];
+
+const tckSearch = document.getElementById('tclient_search');
+const tckHidden = document.getElementById('client_id');
+const tckDrop = document.getElementById('tclient_dropdown');
+
+// Pre-fill
+<% const pId = ticket ? (ticket.client_id || '') : (preselect_client || ''); %>
+<% if (pId) { %>
+const tckPre = tckClients.find(c => c.id === <%= pId %>);
+if (tckPre) tckSearch.value = tckPre.name + ' - ' + tckPre.phone;
+<% } %>
+
+function renderTckDrop(list) {
+  tckDrop.innerHTML = '';
+  if (!list.length) { tckDrop.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">No se encontraron clientes</div>'; return; }
+  list.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'px-3 py-2 text-sm hover:bg-wisp-50 cursor-pointer border-b border-gray-100 last:border-0';
+    d.textContent = c.name + ' - ' + c.phone;
+    d.onclick = () => { tckHidden.value = c.id; tckSearch.value = c.name + ' - ' + c.phone; tckDrop.classList.add('hidden'); };
+    tckDrop.appendChild(d);
+  });
+}
+
+function filterTckClients() {
+  const q = tckSearch.value.toLowerCase().trim();
+  tckHidden.value = '';
+  const list = q ? tckClients.filter(c => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)) : tckClients;
+  renderTckDrop(list.slice(0, 20));
+  tckDrop.classList.remove('hidden');
+}
+
+function showTckDropdown() { filterTckClients(); }
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#tclient_search') && !e.target.closest('#tclient_dropdown')) tckDrop.classList.add('hidden');
+});
+</script>
+
+<%- include('../partials/footer') %>

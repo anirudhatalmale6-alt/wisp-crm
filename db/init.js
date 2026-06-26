@@ -219,6 +219,21 @@ module.exports = function(db) {
     FOREIGN KEY (client_id) REFERENCES clients(id)
   )`);
 
+  // Tickets table (trouble reports / averias)
+  db.exec(`CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT,
+    priority TEXT DEFAULT 'media',
+    status TEXT DEFAULT 'abierto',
+    assigned_to TEXT,
+    resolved_at DATETIME,
+    resolution_notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id)
+  )`);
+
   // Create default admin user
   const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!admin) {

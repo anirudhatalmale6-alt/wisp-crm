@@ -102,13 +102,15 @@ module.exports = function(db) {
 
     const secretaryTotal = secretaryPayments.reduce((sum, p) => sum + p.amount, 0);
 
+    const openTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status IN ('abierto', 'en_progreso')").get().c;
+
     res.render('dashboard', {
       settings,
       totalClients, activeClients, suspendedClients,
       monthlyIncome, prevMonthIncome, newClientsMonth, newClientsMonthList,
       pendingInvoices, overdueInvoices, pendingAmount, clientsPendingInvoices,
       recentPayments, overdueClients, planDistribution,
-      secretaryPayments, secretaryTotal
+      secretaryPayments, secretaryTotal, openTickets
     });
   });
 

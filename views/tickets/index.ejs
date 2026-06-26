@@ -1,0 +1,140 @@
+<%- include('../partials/header', { currentPage: 'tickets', pageTitle: 'Tickets de Averias' }) %>
+
+<!-- Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <a href="/tickets?status=abierto" class="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md hover:border-red-300 transition-all block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Abiertos</p>
+        <p class="text-2xl font-bold text-red-600"><%= counts.abierto %></p>
+      </div>
+      <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-exclamation-circle text-red-600"></i>
+      </div>
+    </div>
+  </a>
+  <a href="/tickets?status=en_progreso" class="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md hover:border-yellow-300 transition-all block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">En Progreso</p>
+        <p class="text-2xl font-bold text-yellow-600"><%= counts.en_progreso %></p>
+      </div>
+      <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-tools text-yellow-600"></i>
+      </div>
+    </div>
+  </a>
+  <a href="/tickets?status=resuelto" class="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md hover:border-green-300 transition-all block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Resueltos</p>
+        <p class="text-2xl font-bold text-green-600"><%= counts.resuelto %></p>
+      </div>
+      <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-check-circle text-green-600"></i>
+      </div>
+    </div>
+  </a>
+</div>
+
+<!-- Actions -->
+<div class="flex items-center justify-between mb-4">
+  <div class="flex gap-2 flex-wrap">
+    <a href="/tickets" class="px-3 py-1.5 rounded-lg text-sm font-medium <%= !filters.status ? 'bg-wisp-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">Todos</a>
+    <a href="/tickets?status=abierto" class="px-3 py-1.5 rounded-lg text-sm font-medium <%= filters.status === 'abierto' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">Abiertos</a>
+    <a href="/tickets?status=en_progreso" class="px-3 py-1.5 rounded-lg text-sm font-medium <%= filters.status === 'en_progreso' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">En Progreso</a>
+    <a href="/tickets?status=resuelto" class="px-3 py-1.5 rounded-lg text-sm font-medium <%= filters.status === 'resuelto' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">Resueltos</a>
+  </div>
+  <a href="/tickets/new" class="bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+    <i class="fas fa-plus mr-1"></i> Nuevo Ticket
+  </a>
+</div>
+
+<!-- Tickets List -->
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+  <% if (tickets.length === 0) { %>
+    <div class="p-8 text-center text-gray-400">
+      <i class="fas fa-ticket-alt text-4xl mb-3"></i>
+      <p>No hay tickets</p>
+    </div>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b text-left">
+            <th class="px-4 py-3 font-semibold text-gray-600">#</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Titulo</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Cliente</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Prioridad</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Asignado</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Estado</th>
+            <th class="px-4 py-3 font-semibold text-gray-600">Fecha</th>
+            <th class="px-4 py-3 font-semibold text-gray-600 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <% tickets.forEach(t => { %>
+          <tr class="hover:bg-gray-50 <%= t.status === 'abierto' ? 'border-l-4 border-l-red-400' : t.status === 'en_progreso' ? 'border-l-4 border-l-yellow-400' : '' %>">
+            <td class="px-4 py-3 text-gray-500 font-mono text-xs"><%= t.id %></td>
+            <td class="px-4 py-3">
+              <a href="/tickets/<%= t.id %>" class="font-medium text-gray-800 hover:text-wisp-600"><%= t.title %></a>
+              <% if (t.description) { %>
+                <p class="text-xs text-gray-400 mt-0.5 truncate max-w-xs"><%= t.description.substring(0, 80) %></p>
+              <% } %>
+            </td>
+            <td class="px-4 py-3">
+              <% if (t.client_id) { %>
+                <a href="/clients/<%= t.client_id %>" class="text-wisp-600 hover:text-wisp-700"><%= t.first_name %> <%= t.last_name %></a>
+                <% if (t.phone) { %><p class="text-xs text-gray-400"><%= t.phone %></p><% } %>
+              <% } else { %>
+                <span class="text-gray-400">-</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <% if (t.priority === 'alta') { %>
+                <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Alta</span>
+              <% } else if (t.priority === 'media') { %>
+                <span class="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">Media</span>
+              <% } else { %>
+                <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">Baja</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-gray-600"><%= t.assigned_to || '-' %></td>
+            <td class="px-4 py-3 text-center">
+              <% if (t.status === 'abierto') { %>
+                <span class="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">Abierto</span>
+              <% } else if (t.status === 'en_progreso') { %>
+                <span class="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">En Progreso</span>
+              <% } else { %>
+                <span class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Resuelto</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= t.created_at ? t.created_at.substring(0, 10) : '' %></td>
+            <td class="px-4 py-3 text-center">
+              <div class="flex items-center justify-center gap-1">
+                <% if (t.status === 'abierto') { %>
+                  <form method="POST" action="/tickets/<%= t.id %>/status" class="inline">
+                    <input type="hidden" name="status" value="en_progreso">
+                    <input type="hidden" name="redirect" value="/tickets<%= filters.status ? '?status=' + filters.status : '' %>">
+                    <button type="submit" class="text-yellow-600 hover:text-yellow-700 px-1" title="Marcar en progreso"><i class="fas fa-play-circle"></i></button>
+                  </form>
+                <% } %>
+                <% if (t.status !== 'resuelto') { %>
+                  <form method="POST" action="/tickets/<%= t.id %>/status" class="inline">
+                    <input type="hidden" name="status" value="resuelto">
+                    <input type="hidden" name="redirect" value="/tickets<%= filters.status ? '?status=' + filters.status : '' %>">
+                    <button type="submit" class="text-green-600 hover:text-green-700 px-1" title="Marcar resuelto"><i class="fas fa-check-circle"></i></button>
+                  </form>
+                <% } %>
+                <a href="/tickets/<%= t.id %>" class="text-wisp-600 hover:text-wisp-700 px-1" title="Ver detalles"><i class="fas fa-eye"></i></a>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
