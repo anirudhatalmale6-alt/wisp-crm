@@ -160,7 +160,22 @@
 </div>
 
 <!-- Stats Cards Row 2 -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <a href="/payments" class="bg-white rounded-xl shadow-sm border-2 border-emerald-200 p-5 hover:shadow-md hover:border-emerald-400 transition-all cursor-pointer block">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500">Ingreso de Hoy</p>
+        <p class="text-2xl font-bold text-emerald-600"><%= settings.currency || '$' %><%= todayIncome.toLocaleString('es', {minimumFractionDigits: 2}) %></p>
+      </div>
+      <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+        <i class="fas fa-calendar-day text-emerald-600 text-xl"></i>
+      </div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">
+      <%= todayPaymentsCount %> <%= todayPaymentsCount === 1 ? 'pago registrado' : 'pagos registrados' %> hoy
+    </div>
+  </a>
+
   <a href="/payments" class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer block">
     <div class="flex items-center justify-between">
       <div>

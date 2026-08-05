@@ -102,6 +102,13 @@ module.exports = function(db) {
 
     const secretaryTotal = secretaryPayments.reduce((sum, p) => sum + p.amount, 0);
 
+    // Today's income - all payments registered today
+    const todayIncomeRow = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM payments WHERE created_at >= ? AND created_at <= ?"
+    ).get(today, today + ' 23:59:59');
+    const todayIncome = todayIncomeRow.total;
+    const todayPaymentsCount = todayIncomeRow.count;
+
     const openTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status IN ('abierto', 'en_progreso')").get().c;
 
     res.render('dashboard', {
@@ -110,7 +117,8 @@ module.exports = function(db) {
       monthlyIncome, prevMonthIncome, newClientsMonth, newClientsMonthList,
       pendingInvoices, overdueInvoices, pendingAmount, clientsPendingInvoices,
       recentPayments, overdueClients, planDistribution,
-      secretaryPayments, secretaryTotal, openTickets
+      secretaryPayments, secretaryTotal, openTickets,
+      todayIncome, todayPaymentsCount
     });
   });
 

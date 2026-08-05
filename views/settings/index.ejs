@@ -406,6 +406,44 @@
     </form>
   </div>
 
+  <!-- Backup / Export -->
+  <div class="bg-white rounded-xl shadow-sm border">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-database text-wisp-600"></i> Respaldo y Exportacion
+      </h3>
+    </div>
+    <div class="p-5 space-y-4">
+      <p class="text-sm text-gray-500">Descarga una copia de seguridad de tu CRM. Guarda estos archivos en un lugar seguro (tu computadora, USB o la nube).</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Full DB backup -->
+        <div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <i class="fas fa-server text-wisp-600"></i>
+            <span class="font-medium text-gray-700 text-sm">Respaldo Completo</span>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Copia completa de toda la base de datos (clientes, facturas, pagos, deudas, todo). Sirve para restaurar el CRM si pasa algo.</p>
+          <a href="/settings/backup/database" class="inline-flex items-center gap-2 bg-wisp-600 hover:bg-wisp-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+            <i class="fas fa-download"></i> Descargar Respaldo (.db)
+          </a>
+        </div>
+
+        <!-- Clients with debt -->
+        <div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <i class="fas fa-file-excel text-green-600"></i>
+            <span class="font-medium text-gray-700 text-sm">Clientes con Deudas</span>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Lista en Excel de todos los clientes con su total facturado, total pagado y cuanto deben. Facil de leer e imprimir.</p>
+          <a href="/settings/backup/debts" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+            <i class="fas fa-download"></i> Descargar Excel de Deudas
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
