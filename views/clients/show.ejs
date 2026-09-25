@@ -39,6 +39,22 @@
           </button>
         </form>
       <% } %>
+      <% if (client.archived_at) { %>
+        <form method="POST" action="/clients/<%= client.id %>/unarchive" class="inline"
+          onsubmit="return confirm('Restaurar a <%= client.first_name %> <%= client.last_name %>? Volvera a la lista de clientes, suspendido.')">
+          <button type="submit" class="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-box-open"></i> Restaurar
+          </button>
+        </form>
+      <% } else { %>
+        <form method="POST" action="/clients/<%= client.id %>/archive" class="inline"
+          onsubmit="return archiveClient(this, '<%= client.first_name %> <%= client.last_name %>')">
+          <input type="hidden" name="archived_reason" value="">
+          <button type="submit" class="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-box-archive"></i> Archivar
+          </button>
+        </form>
+      <% } %>
       <form method="POST" action="/clients/<%= client.id %>/delete" class="inline" onsubmit="return confirmDelete(this, '<%= client.first_name %> <%= client.last_name %>')">
         <button type="submit" class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <i class="fas fa-trash"></i> Eliminar
@@ -47,6 +63,22 @@
     <% } %>
   </div>
 </div>
+
+<% if (client.archived_at) { %>
+<div class="mb-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+  <i class="fas fa-box-archive text-amber-600 text-xl mt-0.5"></i>
+  <div class="text-sm">
+    <p class="font-semibold text-amber-800">Cliente archivado el <%= client.archived_at %></p>
+    <% if (client.archived_reason) { %>
+      <p class="text-amber-700">Motivo: <%= client.archived_reason %></p>
+    <% } %>
+    <p class="text-amber-700 mt-1">
+      No se le generan facturas ni se le aplican cortes automaticos, y no aparece en la lista de clientes.
+      Su historial esta completo. Use "Restaurar" para devolverlo, o "Eliminar" cuando ya no lo necesite.
+    </p>
+  </div>
+</div>
+<% } %>
 
 <!-- Balance Card -->
 <div class="mb-6">

@@ -23,7 +23,8 @@ module.exports = function(db) {
     const activeServices = db.prepare(`SELECT cs.*, p.price, c.first_name, c.last_name FROM client_services cs
       JOIN plans p ON cs.plan_id = p.id
       JOIN clients c ON cs.client_id = c.id
-      WHERE cs.status = 'active' AND c.status != 'inactive'`).all();
+      WHERE cs.status = 'active' AND c.status != 'inactive'
+        AND c.archived_at IS NULL`).all();
 
     let count = 0;
     const prefix = `FAC-${year}${String(month + 1).padStart(2, '0')}`;
@@ -109,6 +110,7 @@ module.exports = function(db) {
       JOIN clients c ON cs.client_id = c.id
       JOIN invoices i ON i.service_id = cs.id
       WHERE cs.status = 'active'
+        AND c.archived_at IS NULL
         AND i.status = 'pending'
         AND i.due_date <= date('now', '-' || ? || ' days')
     `).all(String(graceDays));
@@ -147,6 +149,7 @@ module.exports = function(db) {
       SELECT i.*, c.first_name, c.last_name, c.phone
       FROM invoices i JOIN clients c ON i.client_id = c.id
       WHERE i.status = 'pending'
+        AND c.archived_at IS NULL
         AND i.due_date BETWEEN date('now') AND date('now', '+' || ? || ' days')
     `).all(String(reminderDays));
 

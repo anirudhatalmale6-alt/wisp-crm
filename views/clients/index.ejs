@@ -5,11 +5,22 @@
 <!-- Top bar: title + add button -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div>
-    <h3 class="text-xl font-bold text-gray-800">Lista de Clientes</h3>
+    <h3 class="text-xl font-bold text-gray-800">
+      <%= filters.archived === '1' ? 'Clientes Archivados' : 'Lista de Clientes' %>
+    </h3>
     <p class="text-sm text-gray-500 mt-1"><%= clients.length %> cliente<%= clients.length !== 1 ? 's' : '' %> encontrado<%= clients.length !== 1 ? 's' : '' %></p>
   </div>
   <% if (user.role === 'admin') { %>
   <div class="flex items-center gap-2 flex-wrap">
+    <% if (filters.archived === '1') { %>
+      <a href="/clients" class="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <i class="fas fa-arrow-left"></i> Ver Activos
+      </a>
+    <% } else if (typeof archivedCount !== 'undefined' && archivedCount > 0) { %>
+      <a href="/clients?archived=1" class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <i class="fas fa-box-archive"></i> Archivados (<%= archivedCount %>)
+      </a>
+    <% } %>
     <a href="/clients/export" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
       <i class="fas fa-file-excel"></i> Exportar
     </a>
@@ -26,6 +37,7 @@
 <!-- Filters -->
 <div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
   <form method="GET" action="/clients" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <% if (filters.archived === '1') { %><input type="hidden" name="archived" value="1"><% } %>
     <!-- Search -->
     <div>
       <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>

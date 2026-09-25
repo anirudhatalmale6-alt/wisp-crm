@@ -55,6 +55,7 @@ module.exports = function(db) {
       JOIN plans p ON cs.plan_id = p.id
       JOIN clients c ON cs.client_id = c.id
       WHERE cs.status = 'active' AND c.status != 'inactive'
+        AND c.archived_at IS NULL
     `).all();
 
     let generated = 0;

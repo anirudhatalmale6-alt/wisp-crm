@@ -44,6 +44,18 @@ document.getElementById('deleteModalConfirm').addEventListener('click', function
     deleteForm.submit();
   }
 });
+
+// Archiving is reversible, so a plain confirm is enough - but ask for the
+// reason in the same step so the record says why the client left.
+function archiveClient(form, name) {
+  if (!confirm('Archivar a ' + name + '?\n\nDeja de facturarle y desaparece de la lista, pero no se borra nada. Puede restaurarlo cuando quiera.')) {
+    return false;
+  }
+  var reason = prompt('Motivo (opcional):', '');
+  if (reason === null) return false;
+  form.querySelector('input[name="archived_reason"]').value = reason;
+  return true;
+}
 </script>
 <script>
 if ('serviceWorker' in navigator) {

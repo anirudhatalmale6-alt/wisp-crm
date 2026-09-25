@@ -7,9 +7,11 @@ module.exports = function(db) {
     const settings = {};
     db.prepare('SELECT key, value FROM settings').all().forEach(s => settings[s.key] = s.value);
 
-    const totalClients = db.prepare('SELECT COUNT(*) as count FROM clients').get().count;
-    const activeClients = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'active'").get().count;
-    const suspendedClients = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'suspended'").get().count;
+    // Archived clients are excluded everywhere on the dashboard - they are not
+    // part of the operation any more, they are just kept for the record.
+    const totalClients = db.prepare('SELECT COUNT(*) as count FROM clients WHERE archived_at IS NULL').get().count;
+    const activeClients = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'active' AND archived_at IS NULL").get().count;
+    const suspendedClients = db.prepare("SELECT COUNT(*) as count FROM clients WHERE status = 'suspended' AND archived_at IS NULL").get().count;
 
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -29,7 +31,7 @@ module.exports = function(db) {
 
     // New clients this month
     const newClientsMonth = db.prepare(
-      "SELECT COUNT(*) as count FROM clients WHERE created_at >= ? AND created_at <= ?"
+      "SELECT COUNT(*) as count FROM clients WHERE archived_at IS NULL AND created_at >= ? AND created_at <= ?"
     ).get(monthStart, monthEnd + ' 23:59:59').count;
 
     const newClientsMonthList = db.prepare(`
@@ -37,7 +39,7 @@ module.exports = function(db) {
              p.name as plan_name
       FROM clients c
       LEFT JOIN plans p ON c.plan_id = p.id
-      WHERE c.created_at >= ? AND c.created_at <= ?
+      WHERE c.archived_at IS NULL AND c.created_at >= ? AND c.created_at <= ?
       ORDER BY c.created_at DESC
     `).all(monthStart, monthEnd + ' 23:59:59');
 
@@ -62,7 +64,7 @@ module.exports = function(db) {
              i.invoice_number, i.total, i.due_date
       FROM clients c
       JOIN invoices i ON i.client_id = c.id
-      WHERE i.status = 'pending' AND i.due_date < date('now')
+      WHERE i.status = 'pending' AND i.due_date < date('now') AND c.archived_at IS NULL
       ORDER BY i.due_date ASC LIMIT 10
     `).all();
 
@@ -73,7 +75,7 @@ module.exports = function(db) {
              MIN(i.due_date) as oldest_due
       FROM clients c
       JOIN invoices i ON i.client_id = c.id
-      WHERE i.status = 'pending'
+      WHERE i.status = 'pending' AND c.archived_at IS NULL
       GROUP BY c.id
       ORDER BY total_pending DESC
     `).all();
@@ -81,7 +83,7 @@ module.exports = function(db) {
     const planDistribution = db.prepare(`
       SELECT p.id, p.name, COUNT(c.id) as count
       FROM plans p
-      LEFT JOIN clients c ON c.plan_id = p.id
+      LEFT JOIN clients c ON c.plan_id = p.id AND c.archived_at IS NULL
       GROUP BY p.id
       ORDER BY count DESC
     `).all();

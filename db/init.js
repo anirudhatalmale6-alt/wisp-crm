@@ -234,6 +234,19 @@ module.exports = function(db) {
     FOREIGN KEY (client_id) REFERENCES clients(id)
   )`);
 
+  // Archiving: a client kept out of the way (no billing, no cuts, hidden from
+  // the list) but with all of their history intact, so it can be deleted later.
+  try { db.exec('ALTER TABLE clients ADD COLUMN archived_at DATETIME'); } catch(e) {}
+  try { db.exec('ALTER TABLE clients ADD COLUMN archived_reason TEXT'); } catch(e) {}
+
+  // These columns point at tables created further down this file, so on a brand
+  // new database the ALTERs above their CREATE TABLE fail silently and only
+  // land on the second boot. Re-run them here, after everything exists.
+  try { db.exec('ALTER TABLE invoices ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+  try { db.exec('ALTER TABLE mikrotik_queue ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+  try { db.exec('ALTER TABLE service_cuts ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
+  try { db.exec('ALTER TABLE payments ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch(e) {}
+
   // Create default admin user
   const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!admin) {

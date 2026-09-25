@@ -256,6 +256,7 @@ module.exports = function(db) {
       JOIN client_services cs ON cs.client_id = c.id
       LEFT JOIN plans p ON cs.plan_id = p.id
       WHERE c.status = 'active' AND cs.status = 'active'
+        AND c.archived_at IS NULL
         AND cs.pppoe_user IS NOT NULL AND cs.pppoe_user != ''
     `).all();
 

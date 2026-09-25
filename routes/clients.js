@@ -49,10 +49,13 @@ module.exports = function(db) {
 
   // List clients
   router.get('/', (req, res) => {
-    const { search, status, plan_id, sort } = req.query;
+    const { search, status, plan_id, sort, archived } = req.query;
     let sql = `SELECT c.*, p.name as plan_name, p.price as plan_price, p.speed_down
                FROM clients c LEFT JOIN plans p ON c.plan_id = p.id WHERE 1=1`;
     const params = [];
+
+    // Archived clients are out of the way by default; ?archived=1 shows only them
+    sql += archived === '1' ? ' AND c.archived_at IS NOT NULL' : ' AND c.archived_at IS NULL';
 
     if (search) {
       const cleanSearch = search.replace(/[-() ]/g, '');
@@ -92,7 +95,9 @@ module.exports = function(db) {
     if (sort === 'balance') clients.sort((a, b) => a.balance - b.balance);
     if (sort === 'balance_desc') clients.sort((a, b) => b.balance - a.balance);
 
-    res.render('clients/index', { clients, plans, filters: req.query, settings: getSettings() });
+    const archivedCount = db.prepare('SELECT COUNT(*) as c FROM clients WHERE archived_at IS NOT NULL').get().c;
+
+    res.render('clients/index', { clients, plans, filters: req.query, archivedCount, settings: getSettings() });
   });
 
   // Live search API
@@ -105,11 +110,12 @@ module.exports = function(db) {
     const clients = db.prepare(`SELECT c.id, c.first_name, c.last_name, c.phone, c.status,
       p.name as plan_name, c.ip_address
       FROM clients c LEFT JOIN plans p ON c.plan_id = p.id
-      WHERE c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE
+      WHERE c.archived_at IS NULL AND (
+        c.first_name LIKE ? COLLATE NOCASE OR c.last_name LIKE ? COLLATE NOCASE
         OR REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ?
         OR c.pppoe_user LIKE ? COLLATE NOCASE OR c.ip_address LIKE ?
         OR c.address LIKE ? COLLATE NOCASE OR c.cedula LIKE ?
-        OR c.id IN (SELECT cs.client_id FROM client_services cs WHERE cs.pppoe_user LIKE ? COLLATE NOCASE OR cs.label LIKE ? COLLATE NOCASE OR cs.ip_address LIKE ? OR cs.onu_serial LIKE ? COLLATE NOCASE)
+        OR c.id IN (SELECT cs.client_id FROM client_services cs WHERE cs.pppoe_user LIKE ? COLLATE NOCASE OR cs.label LIKE ? COLLATE NOCASE OR cs.ip_address LIKE ? OR cs.onu_serial LIKE ? COLLATE NOCASE))
       ORDER BY c.first_name, c.last_name LIMIT 15`).all(s, s, sp, s, s, s, s, s, s, s, s);
     res.json(clients);
   });
@@ -429,31 +435,123 @@ module.exports = function(db) {
   });
 
   // Delete service
+  // Invoices and cut history reference the service, so a plain DELETE fails on
+  // the foreign key ("no me deja borrarlo"). Detach the paperwork instead of
+  // destroying it: the invoices stay on the client, they just stop pointing at
+  // a service that no longer exists.
   router.post('/:id/services/:serviceId/delete', (req, res) => {
     if (req.session.user.role !== 'admin') {
       req.session.error = 'No tiene permisos';
       return res.redirect('/clients/' + req.params.id);
     }
-    db.prepare('DELETE FROM mikrotik_queue WHERE service_id = ?').run(req.params.serviceId);
-    db.prepare('DELETE FROM client_services WHERE id = ? AND client_id = ?').run(req.params.serviceId, req.params.id);
-    req.session.success = 'Servicio eliminado';
+    const svc = db.prepare('SELECT * FROM client_services WHERE id = ? AND client_id = ?')
+      .get(req.params.serviceId, req.params.id);
+    if (!svc) {
+      req.session.error = 'El servicio no existe o no pertenece a este cliente';
+      return res.redirect('/clients/' + req.params.id);
+    }
+
+    try {
+      const invoiceCount = db.prepare('SELECT COUNT(*) as c FROM invoices WHERE service_id = ?').get(svc.id).c;
+
+      db.transaction(() => {
+        db.prepare('UPDATE invoices SET service_id = NULL WHERE service_id = ?').run(svc.id);
+        db.prepare('UPDATE service_cuts SET service_id = NULL WHERE service_id = ?').run(svc.id);
+        db.prepare('DELETE FROM mikrotik_queue WHERE service_id = ?').run(svc.id);
+        db.prepare('DELETE FROM client_services WHERE id = ? AND client_id = ?').run(svc.id, req.params.id);
+      })();
+
+      req.session.success = invoiceCount > 0
+        ? `Servicio eliminado. Sus ${invoiceCount} factura(s) se conservaron en el cliente.`
+        : 'Servicio eliminado';
+    } catch (e) {
+      req.session.error = 'No se pudo eliminar el servicio: ' + e.message;
+    }
+    res.redirect('/clients/' + req.params.id);
+  });
+
+  // Archive client: stops billing and cuts, hides from the list, keeps everything
+  router.post('/:id/archive', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos para archivar clientes';
+      return res.redirect('/clients/' + req.params.id);
+    }
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+    if (!client) {
+      req.session.error = 'Cliente no encontrado';
+      return res.redirect('/clients');
+    }
+
+    const reason = (req.body.archived_reason || '').trim() || null;
+    db.transaction(() => {
+      db.prepare("UPDATE clients SET archived_at = datetime('now'), archived_reason = ?, status = 'inactive' WHERE id = ?")
+        .run(reason, client.id);
+      // Services must stop too, otherwise the 6 AM job keeps invoicing them
+      db.prepare("UPDATE client_services SET status = 'inactive' WHERE client_id = ?").run(client.id);
+      db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'archive', ?, 0)")
+        .run(client.id, reason || 'Cliente archivado');
+    })();
+
+    req.session.success = `${client.first_name} ${client.last_name} archivado. No se le generaran mas facturas.`;
+    res.redirect('/clients/' + req.params.id);
+  });
+
+  // Unarchive: back to the normal list, but left suspended on purpose so the
+  // operator decides when service actually resumes
+  router.post('/:id/unarchive', (req, res) => {
+    if (req.session.user.role !== 'admin') {
+      req.session.error = 'No tiene permisos';
+      return res.redirect('/clients/' + req.params.id);
+    }
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+    if (!client) {
+      req.session.error = 'Cliente no encontrado';
+      return res.redirect('/clients');
+    }
+
+    db.transaction(() => {
+      db.prepare("UPDATE clients SET archived_at = NULL, archived_reason = NULL, status = 'suspended' WHERE id = ?")
+        .run(client.id);
+      db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'unarchive', 'Cliente restaurado', 0)")
+        .run(client.id);
+    })();
+
+    req.session.success = `${client.first_name} ${client.last_name} restaurado. Quedo suspendido: reconecte el servicio cuando corresponda.`;
     res.redirect('/clients/' + req.params.id);
   });
 
   // Delete client (admin only)
+  // One transaction: a half-finished delete used to wipe the invoices and
+  // payments and then fail on the last statement, leaving the client in place
+  // with no billing history at all.
   router.post('/:id/delete', (req, res) => {
     if (req.session.user.role !== 'admin') {
       req.session.error = 'No tiene permisos para eliminar clientes';
       return res.redirect('/clients');
     }
-    db.prepare('DELETE FROM mikrotik_queue WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM whatsapp_log WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM service_cuts WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM payments WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM invoices WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM client_services WHERE client_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
-    req.session.success = 'Cliente eliminado';
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+    if (!client) {
+      req.session.error = 'Cliente no encontrado';
+      return res.redirect('/clients');
+    }
+
+    try {
+      db.transaction(() => {
+        // Children first, and payments before invoices (payments.invoice_id)
+        db.prepare('DELETE FROM mikrotik_queue WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM whatsapp_log WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM tickets WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM service_cuts WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM payments WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM invoices WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM client_services WHERE client_id = ?').run(client.id);
+        db.prepare('DELETE FROM clients WHERE id = ?').run(client.id);
+      })();
+      req.session.success = 'Cliente eliminado';
+    } catch (e) {
+      req.session.error = 'No se pudo eliminar el cliente: ' + e.message;
+      return res.redirect('/clients/' + client.id);
+    }
     res.redirect('/clients');
   });
 
