@@ -1,0 +1,650 @@
+<%- include('../partials/header', { currentPage: 'olt', pageTitle: 'OLT ZTE' }) %>
+
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+  <div>
+    <h2 class="text-xl font-bold text-gray-800">OLT ZTE <span class="text-gray-400 font-normal text-base">C300 / C320</span></h2>
+    <p class="text-sm text-gray-500">
+      <% if (demo) { %>Modo demostracion<% } else { %><%= host %> &middot; <%= transport === 'ssh' ? 'SSH' : 'Telnet' %><% } %>
+      <span id="fetched-at" class="ml-1 text-gray-400"></span>
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button onclick="loadData(true)" id="btn-refresh" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+      <i class="fas fa-sync-alt mr-1"></i> Actualizar
+    </button>
+    <button onclick="testConnection()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+      <i class="fas fa-plug mr-1"></i> Probar conexion
+    </button>
+    <% if (configured) { %>
+      <% if (demo) { %>
+        <a href="/olt" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm">Ver OLT real</a>
+      <% } else { %>
+        <a href="/olt?demo=1" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm">Ver demostracion</a>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<% if (demo) { %>
+<div class="mb-5 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+  <i class="fas fa-flask text-amber-600 text-xl mt-0.5"></i>
+  <div class="text-sm text-amber-800">
+    <p class="font-semibold">Modo demostracion: datos de ejemplo, no es su red</p>
+    <p class="mt-1">Asi se va a ver el panel con la OLT ZTE. Los seriales empiezan con DEMO y los clientes son de ejemplo.
+      Puede abrir todo y ver los comandos que se mandarian, pero no se envia nada a ningun equipo.
+      <% if (!configured) { %>Cuando tenga la OLT, ponga la IP y el usuario en <a href="/settings#zte" class="underline font-medium">Configuracion</a> y el panel pasa a la OLT real.<% } %></p>
+  </div>
+</div>
+<% } %>
+
+<div id="test-result" class="hidden mb-5"></div>
+<div id="load-error" class="hidden mb-5 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+  <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">ONUs registradas</p><p class="text-2xl font-bold text-gray-800" id="st-total">-</p></div>
+  <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">En linea</p><p class="text-2xl font-bold text-emerald-600" id="st-online">-</p></div>
+  <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">Sin servicio</p><p class="text-2xl font-bold text-red-600" id="st-offline">-</p></div>
+  <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">Señal baja</p><p class="text-2xl font-bold text-amber-600" id="st-low">-</p></div>
+  <div class="bg-white rounded-xl border-2 border-indigo-200 p-4 cursor-pointer" onclick="showTab('new')"><p class="text-xs text-gray-500">Nuevas sin autorizar</p><p class="text-2xl font-bold text-indigo-600" id="st-new">-</p></div>
+  <div class="bg-white rounded-xl border p-4"><p class="text-xs text-gray-500">Sin cliente en el CRM</p><p class="text-2xl font-bold text-gray-500" id="st-unlinked">-</p></div>
+</div>
+
+<!-- Tabs -->
+<div class="bg-white rounded-xl shadow-sm border">
+  <div class="flex border-b overflow-x-auto text-sm">
+    <button data-tab="new" onclick="showTab('new')" class="tab-btn px-5 py-3 font-medium whitespace-nowrap">Nuevas <span id="tab-new-count" class="ml-1 bg-indigo-100 text-indigo-700 rounded-full px-2 text-xs">0</span></button>
+    <button data-tab="reg" onclick="showTab('reg')" class="tab-btn px-5 py-3 font-medium whitespace-nowrap">Registradas</button>
+    <button data-tab="console" onclick="showTab('console')" class="tab-btn px-5 py-3 font-medium whitespace-nowrap">Consola</button>
+    <button data-tab="log" onclick="showTab('log')" class="tab-btn px-5 py-3 font-medium whitespace-nowrap">Historial</button>
+  </div>
+
+  <!-- New / unconfigured -->
+  <div id="tab-new" class="tab-pane p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <p class="text-sm text-gray-500">ONUs conectadas a la fibra que la OLT todavia no tiene autorizadas.</p>
+      <button onclick="bulkPreview(false)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm">
+        <i class="fas fa-check-double mr-1"></i> Autorizar las que ya tienen cliente
+      </button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-gray-500 border-b">
+          <th class="py-2 pr-4 font-medium">Puerto PON</th><th class="py-2 pr-4 font-medium">Serial</th>
+          <th class="py-2 pr-4 font-medium">ID libre</th><th class="py-2 pr-4 font-medium">Cliente en el CRM</th><th class="py-2"></th>
+        </tr></thead>
+        <tbody id="new-body"><tr><td colspan="5" class="py-6 text-center text-gray-400">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Registered -->
+  <div id="tab-reg" class="tab-pane p-5 hidden">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+      <input id="f-search" oninput="renderRegistered()" type="text" placeholder="Buscar serial, cliente o ONU..."
+        class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      <select id="f-port" onchange="renderRegistered()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">Todos los puertos</option></select>
+      <select id="f-status" onchange="renderRegistered()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <option value="">Todas</option><option value="online">En linea</option><option value="offline">Sin servicio</option>
+        <option value="low">Señal baja</option><option value="unlinked">Sin cliente en el CRM</option>
+      </select>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-gray-500 border-b">
+          <th class="py-2 pr-4 font-medium">ONU</th><th class="py-2 pr-4 font-medium">Serial</th><th class="py-2 pr-4 font-medium">Tipo</th>
+          <th class="py-2 pr-4 font-medium">Cliente</th><th class="py-2 pr-4 font-medium">Estado</th><th class="py-2 pr-4 font-medium">Señal</th><th class="py-2"></th>
+        </tr></thead>
+        <tbody id="reg-body"><tr><td colspan="7" class="py-6 text-center text-gray-400">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Console -->
+  <div id="tab-console" class="tab-pane p-5 hidden">
+    <% if (demo) { %>
+      <p class="text-sm text-gray-500">La consola manda comandos directo a la OLT, asi que solo funciona con la OLT real configurada.</p>
+    <% } else { %>
+      <p class="text-sm text-gray-500 mb-3">Un comando por vez. Todo lo que se manda queda en el Historial.</p>
+      <form onsubmit="runConsole(event)" class="flex gap-2 mb-3">
+        <input id="console-cmd" type="text" placeholder="show gpon onu state" autocomplete="off"
+          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none">
+        <button class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-terminal mr-1"></i> Enviar</button>
+      </form>
+      <pre id="console-out" class="bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-auto max-h-96 whitespace-pre"></pre>
+    <% } %>
+  </div>
+
+  <!-- Log -->
+  <div id="tab-log" class="tab-pane p-5 hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-gray-500 border-b">
+          <th class="py-2 pr-4 font-medium">Fecha</th><th class="py-2 pr-4 font-medium">Usuario</th><th class="py-2 pr-4 font-medium">Accion</th>
+          <th class="py-2 pr-4 font-medium">ONU</th><th class="py-2 pr-4 font-medium">Serial</th><th class="py-2 font-medium">Resultado</th>
+        </tr></thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Authorize modal -->
+<div id="auth-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-800">Autorizar ONU <span id="auth-serial" class="font-mono text-indigo-600"></span></h3>
+      <button onclick="closeModal('auth-modal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+        <div id="auth-client-chosen" class="hidden mb-2 text-sm bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 flex items-center justify-between">
+          <span id="auth-client-name"></span>
+          <button type="button" onclick="clearClient()" class="text-indigo-600 text-xs underline">cambiar</button>
+        </div>
+        <div id="auth-client-search-box" class="relative">
+          <input id="auth-client-search" type="text" placeholder="Buscar cliente por nombre, telefono o usuario PPPoE..." autocomplete="off"
+            oninput="searchClients()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          <div id="auth-client-results" class="hidden absolute z-10 w-full bg-white border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto"></div>
+        </div>
+        <select id="auth-service" class="hidden mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></select>
+        <p class="text-xs text-gray-400 mt-1">Opcional. Si elige el cliente, el serial y la ONU quedan guardados en su servicio.</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre en la OLT</label>
+          <input id="auth-name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="Nombre_Apellido">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Puerto PON y ID</label>
+          <div class="flex gap-2">
+            <input id="auth-port" type="text" readonly class="flex-1 px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm font-mono">
+            <input id="auth-onuid" type="number" min="1" max="128" class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de ONU</label>
+          <input id="auth-type" type="text" list="auth-types" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+          <datalist id="auth-types"><option value="ZTE-F660"><option value="ZTE-F670L"><option value="ZTE-F601"><option value="ZTE-F680"><option value="ALL-ONT"></datalist>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Modo</label>
+          <select id="auth-mode" onchange="toggleModeFields()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <option value="bridge">Bridge (el PPPoE sigue en el MikroTik)</option>
+            <option value="register">Solo registrar la ONU</option>
+          </select>
+        </div>
+        <div class="mode-bridge">
+          <label class="block text-sm font-medium text-gray-700 mb-1">VLAN</label>
+          <input id="auth-vlan" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="100">
+        </div>
+        <div class="mode-bridge">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Perfil T-CONT</label>
+          <input id="auth-tcont" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="1G">
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="auth-save" type="checkbox" checked class="rounded"> Guardar la configuracion de la OLT al terminar (write)
+      </label>
+      <div id="auth-error" class="hidden text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+      <div id="auth-preview" class="hidden">
+        <p class="text-sm font-medium text-gray-700 mb-1">Comandos que se van a enviar a la OLT:</p>
+        <pre id="auth-commands" class="bg-gray-900 text-green-300 text-xs rounded-lg p-3 overflow-auto max-h-64"></pre>
+      </div>
+      <div id="auth-result" class="hidden"></div>
+    </div>
+    <div class="px-5 py-4 border-t flex flex-wrap justify-end gap-2">
+      <button onclick="closeModal('auth-modal')" class="px-4 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50">Cancelar</button>
+      <button onclick="authorize(false)" class="px-4 py-2 rounded-lg text-sm bg-gray-700 hover:bg-gray-800 text-white"><i class="fas fa-eye mr-1"></i> Ver comandos</button>
+      <button id="auth-send" onclick="authorize(true)" disabled class="px-4 py-2 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"><i class="fas fa-paper-plane mr-1"></i> Enviar a la OLT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div id="detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-800">ONU <span id="det-index" class="font-mono text-indigo-600"></span></h3>
+      <button onclick="closeModal('detail-modal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-5">
+      <div id="det-body" class="text-sm text-gray-500">Cargando...</div>
+      <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t">
+        <button onclick="actionPreview('reboot')" class="px-3 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white"><i class="fas fa-redo mr-1"></i> Reiniciar</button>
+        <button id="det-btn-toggle" onclick="" class="px-3 py-2 rounded-lg text-sm bg-amber-500 hover:bg-amber-600 text-white"></button>
+        <button onclick="actionPreview('delete')" class="px-3 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-700 text-white"><i class="fas fa-trash mr-1"></i> Eliminar de la OLT</button>
+      </div>
+      <div id="act-box" class="hidden mt-4">
+        <p id="act-title" class="text-sm font-medium text-gray-700 mb-1"></p>
+        <pre id="act-commands" class="bg-gray-900 text-green-300 text-xs rounded-lg p-3 overflow-auto max-h-48"></pre>
+        <div id="act-result" class="hidden mt-2"></div>
+        <div class="flex justify-end gap-2 mt-3">
+          <button onclick="document.getElementById('act-box').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50">Cancelar</button>
+          <button id="act-send" onclick="actionSend()" class="px-4 py-2 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"><i class="fas fa-paper-plane mr-1"></i> Enviar a la OLT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk modal -->
+<div id="bulk-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="font-semibold text-gray-800">Autorizar ONUs que ya tienen cliente</h3>
+      <button onclick="closeModal('bulk-modal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="px-5 pt-5">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div><label class="block text-xs text-gray-500 mb-1">Tipo de ONU</label>
+          <input id="bulk-type" list="auth-types" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg font-mono"></div>
+        <div><label class="block text-xs text-gray-500 mb-1">Modo</label>
+          <select id="bulk-mode" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg"><option value="bridge">Bridge</option><option value="register">Solo registrar</option></select></div>
+        <div><label class="block text-xs text-gray-500 mb-1">VLAN</label>
+          <input id="bulk-vlan" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg font-mono"></div>
+        <div><label class="block text-xs text-gray-500 mb-1">Perfil T-CONT</label>
+          <input id="bulk-tcont" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg font-mono"></div>
+      </div>
+      <button onclick="bulkPreview(true)" class="mt-3 text-sm text-indigo-600 hover:underline"><i class="fas fa-redo mr-1"></i> Recalcular con estos valores</button>
+    </div>
+    <div class="p-5 text-sm" id="bulk-body">Cargando...</div>
+    <div class="px-5 py-4 border-t flex justify-end gap-2">
+      <button onclick="closeModal('bulk-modal')" class="px-4 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50">Cerrar</button>
+      <button id="bulk-send" onclick="bulkSend()" class="px-4 py-2 rounded-lg text-sm bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"><i class="fas fa-paper-plane mr-1"></i> Autorizar todas</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var DEMO = <%= demo ? 'true' : 'false' %>;
+// Viewing the demo while a real OLT is configured needs the flag on every call
+var FORCE_DEMO = <%= (demo && configured) ? 'true' : 'false' %>;
+var DEFAULTS = <%- JSON.stringify(defaults).replace(/</g, '\\u003c') %>;
+var DATA = null;
+var current = { auth: null, detail: null, action: null };
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function q(url) { return FORCE_DEMO ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'demo=1' : url; }
+async function getJSON(url) { var r = await fetch(q(url)); return r.json(); }
+async function postJSON(url, body) {
+  if (FORCE_DEMO) body.demo = true;
+  var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json();
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.add('hidden'); });
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    var on = b.getAttribute('data-tab') === name;
+    b.classList.toggle('text-indigo-700', on); b.classList.toggle('border-b-2', on); b.classList.toggle('border-indigo-600', on);
+    b.classList.toggle('text-gray-500', !on);
+  });
+  if (name === 'log') loadLog();
+}
+function msgBox(ok, text) {
+  return '<div class="text-sm rounded-lg p-3 ' + (ok ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-red-50 border border-red-200 text-red-700') + '">' + esc(text) + '</div>';
+}
+
+var SIGNAL_CLASS = { good: 'text-emerald-600', warn: 'text-amber-600', critical: 'text-red-600', high: 'text-purple-600', unknown: 'text-gray-400' };
+function signalHtml(rx, sig) {
+  if (rx === null || rx === undefined) return '<span class="text-gray-400">-</span>';
+  return '<span class="font-mono ' + SIGNAL_CLASS[sig.level] + '" title="' + esc(sig.label) + '">' + rx.toFixed(2) + ' dBm</span>';
+}
+function stateHtml(o) {
+  if (o.adminState === 'disable') return '<span class="px-2 py-0.5 rounded-full text-xs bg-gray-200 text-gray-700">Deshabilitada</span>';
+  if (o.online) return '<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">En linea</span>';
+  var label = { los: 'Sin fibra (LOS)', dyinggasp: 'Sin energia', offline: 'Apagada' }[o.phaseState] || o.phaseState;
+  return '<span class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">' + esc(label) + '</span>';
+}
+function clientHtml(c) {
+  if (!c) return '<span class="text-gray-400">Sin asignar</span>';
+  var t = c.clientId ? '<a href="/clients/' + c.clientId + '" class="text-indigo-600 hover:underline">' + esc(c.name) + '</a>' : esc(c.name);
+  if (c.label) t += ' <span class="text-xs text-gray-400">(' + esc(c.label) + ')</span>';
+  if (c.archived) t += ' <span class="text-xs text-amber-600">archivado</span>';
+  return t;
+}
+
+async function loadData(refresh) {
+  var btn = document.getElementById('btn-refresh');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Consultando OLT...';
+  var err = document.getElementById('load-error');
+  try {
+    var d = await getJSON('/olt/api/data' + (refresh ? '?refresh=1' : ''));
+    if (!d.ok) throw new Error(d.error);
+    DATA = d;
+    err.classList.add('hidden');
+    document.getElementById('fetched-at').textContent = '· consultado ' + new Date(d.fetchedAt).toLocaleTimeString('es');
+    var s = d.stats;
+    document.getElementById('st-total').textContent = s.total;
+    document.getElementById('st-online').textContent = s.online;
+    document.getElementById('st-offline').textContent = s.offline;
+    document.getElementById('st-low').textContent = s.lowSignal;
+    document.getElementById('st-new').textContent = s.unconfigured;
+    document.getElementById('st-unlinked').textContent = s.unlinked;
+    document.getElementById('tab-new-count').textContent = s.unconfigured;
+    var portSel = document.getElementById('f-port'), keep = portSel.value;
+    portSel.innerHTML = '<option value="">Todos los puertos</option>' + d.ports.map(function(p) { return '<option>' + esc(p) + '</option>'; }).join('');
+    portSel.value = keep;
+    renderNew(); renderRegistered();
+  } catch (e) {
+    err.textContent = 'No se pudo consultar la OLT: ' + e.message;
+    err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Actualizar';
+  }
+}
+
+function renderNew() {
+  var body = document.getElementById('new-body');
+  if (!DATA.unconfigured.length) {
+    body.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-400">No hay ONUs nuevas esperando autorizacion</td></tr>';
+    return;
+  }
+  body.innerHTML = DATA.unconfigured.map(function(u, i) {
+    var client = u.client
+      ? '<span class="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700"><i class="fas fa-link mr-1"></i>' + esc(u.client.name) + '</span>'
+      : '<span class="text-gray-400">No esta en el CRM</span>';
+    return '<tr class="border-b last:border-0">' +
+      '<td class="py-2 pr-4 font-mono">' + esc(u.ponPort) + '</td>' +
+      '<td class="py-2 pr-4 font-mono font-medium">' + esc(u.serial) + '</td>' +
+      '<td class="py-2 pr-4 font-mono">' + (u.freeId ? u.freeId : '<span class="text-red-600">lleno</span>') + '</td>' +
+      '<td class="py-2 pr-4">' + client + '</td>' +
+      '<td class="py-2 text-right"><button onclick="openAuthorize(' + i + ')" class="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-700 text-white">Autorizar</button></td></tr>';
+  }).join('');
+}
+
+function renderRegistered() {
+  if (!DATA) return;
+  var text = document.getElementById('f-search').value.trim().toLowerCase();
+  var port = document.getElementById('f-port').value;
+  var status = document.getElementById('f-status').value;
+  var rows = DATA.registered.filter(function(o) {
+    if (port && o.ponPort !== port) return false;
+    if (status === 'online' && !o.online) return false;
+    if (status === 'offline' && o.online) return false;
+    if (status === 'low' && !(o.signal.level === 'warn' || o.signal.level === 'critical')) return false;
+    if (status === 'unlinked' && o.client) return false;
+    if (text) {
+      var hay = [o.onuIndex, o.serial, o.type, o.client && o.client.name, o.client && o.client.pppoeUser].join(' ').toLowerCase();
+      if (hay.indexOf(text) < 0) return false;
+    }
+    return true;
+  });
+  var body = document.getElementById('reg-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-gray-400">Ninguna ONU coincide</td></tr>'; return; }
+  body.innerHTML = rows.map(function(o) {
+    return '<tr class="border-b last:border-0 hover:bg-gray-50">' +
+      '<td class="py-2 pr-4 font-mono whitespace-nowrap">' + esc(o.onuIndex.replace('gpon-onu_', '')) + '</td>' +
+      '<td class="py-2 pr-4 font-mono">' + esc(o.serial || '-') + '</td>' +
+      '<td class="py-2 pr-4">' + esc(o.type || '-') + '</td>' +
+      '<td class="py-2 pr-4">' + clientHtml(o.client) + '</td>' +
+      '<td class="py-2 pr-4 whitespace-nowrap">' + stateHtml(o) + '</td>' +
+      '<td class="py-2 pr-4 whitespace-nowrap">' + signalHtml(o.rx, o.signal) + '</td>' +
+      '<td class="py-2 text-right"><button onclick="openDetail(\'' + esc(o.onuIndex) + '\')" class="px-3 py-1.5 rounded-lg text-xs border border-gray-300 hover:bg-gray-100">Ver</button></td></tr>';
+  }).join('');
+}
+
+// ----- Authorize -----
+var searchTimer = null;
+function openAuthorize(i) {
+  var u = DATA.unconfigured[i];
+  current.auth = { serial: u.serial, port: u.ponPort, clientId: null };
+  document.getElementById('auth-serial').textContent = u.serial;
+  document.getElementById('auth-port').value = u.ponPort;
+  document.getElementById('auth-onuid').value = u.freeId || '';
+  document.getElementById('auth-type').value = DEFAULTS.onuType || '';
+  document.getElementById('auth-vlan').value = DEFAULTS.vlan || '';
+  document.getElementById('auth-tcont').value = DEFAULTS.tcontProfile || '';
+  document.getElementById('auth-mode').value = 'bridge';
+  document.getElementById('auth-save').checked = true;
+  document.getElementById('auth-name').value = '';
+  ['auth-error', 'auth-preview', 'auth-result'].forEach(function(id) { document.getElementById(id).classList.add('hidden'); });
+  document.getElementById('auth-send').disabled = true;
+  toggleModeFields();
+  clearClient();
+  if (u.client && u.client.clientId) pickClient(u.client.clientId, u.client.name, u.client.serviceId);
+  else if (u.client) document.getElementById('auth-name').value = safeName(u.client.name);
+  openModal('auth-modal');
+}
+function toggleModeFields() {
+  var bridge = document.getElementById('auth-mode').value === 'bridge';
+  document.querySelectorAll('.mode-bridge').forEach(function(el) { el.classList.toggle('hidden', !bridge); });
+  document.getElementById('auth-send').disabled = true;
+}
+function safeName(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9_.\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 32);
+}
+function clearClient() {
+  current.auth && (current.auth.clientId = null);
+  document.getElementById('auth-client-chosen').classList.add('hidden');
+  document.getElementById('auth-client-search-box').classList.remove('hidden');
+  document.getElementById('auth-client-search').value = '';
+  document.getElementById('auth-service').classList.add('hidden');
+  document.getElementById('auth-service').innerHTML = '';
+}
+function searchClients() {
+  clearTimeout(searchTimer);
+  var term = document.getElementById('auth-client-search').value.trim();
+  var box = document.getElementById('auth-client-results');
+  if (term.length < 2) { box.classList.add('hidden'); return; }
+  searchTimer = setTimeout(async function() {
+    var r = await fetch('/clients/api/search?q=' + encodeURIComponent(term));
+    var list = await r.json();
+    box.innerHTML = list.length ? list.map(function(c) {
+      var n = (c.first_name + ' ' + c.last_name).trim();
+      return '<button type="button" class="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm" data-id="' + c.id + '" data-name="' + esc(n) + '">' +
+        esc(n) + ' <span class="text-xs text-gray-400">' + esc(c.phone || '') + '</span></button>';
+    }).join('') : '<p class="px-3 py-2 text-sm text-gray-400">Sin resultados</p>';
+    box.querySelectorAll('button').forEach(function(b) {
+      b.onclick = function() { pickClient(b.getAttribute('data-id'), b.getAttribute('data-name'), null); };
+    });
+    box.classList.remove('hidden');
+  }, 250);
+}
+async function pickClient(id, name, serviceId) {
+  document.getElementById('auth-client-results').classList.add('hidden');
+  var d = await getJSON('/olt/api/client-services?client_id=' + encodeURIComponent(id));
+  if (!d.ok) { showAuthError(d.error); return; }
+  current.auth.clientId = d.client.id;
+  document.getElementById('auth-client-name').textContent = d.client.name;
+  document.getElementById('auth-client-chosen').classList.remove('hidden');
+  document.getElementById('auth-client-search-box').classList.add('hidden');
+  var sel = document.getElementById('auth-service');
+  sel.innerHTML = d.services.map(function(s) {
+    var t = (s.label || 'Servicio') + ' - ' + (s.plan_name || 'sin plan') + (s.pppoe_user ? ' - ' + s.pppoe_user : '') + (s.onu_serial ? ' (ONU actual: ' + s.onu_serial + ')' : '');
+    return '<option value="' + s.id + '"' + (String(s.id) === String(serviceId) ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }).join('');
+  sel.classList.toggle('hidden', !d.services.length);
+  if (!document.getElementById('auth-name').value) document.getElementById('auth-name').value = safeName(d.client.name);
+  document.getElementById('auth-send').disabled = true;
+}
+function showAuthError(text) {
+  var e = document.getElementById('auth-error'); e.textContent = text; e.classList.remove('hidden');
+}
+async function authorize(confirmSend) {
+  document.getElementById('auth-error').classList.add('hidden');
+  var sel = document.getElementById('auth-service');
+  var body = {
+    serial: current.auth.serial, port: current.auth.port,
+    onuId: document.getElementById('auth-onuid').value,
+    name: document.getElementById('auth-name').value.trim(),
+    onuType: document.getElementById('auth-type').value.trim(),
+    mode: document.getElementById('auth-mode').value,
+    vlan: document.getElementById('auth-vlan').value.trim(),
+    tcontProfile: document.getElementById('auth-tcont').value.trim(),
+    save: document.getElementById('auth-save').checked,
+    serviceId: current.auth.clientId && sel.value ? sel.value : null,
+    confirm: confirmSend
+  };
+  var btn = document.getElementById('auth-send');
+  if (confirmSend) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Enviando...'; }
+  var d = await postJSON('/olt/api/authorize', body);
+  btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i> Enviar a la OLT';
+  if (!confirmSend) {
+    if (!d.ok) { showAuthError(d.error); return; }
+    document.getElementById('auth-commands').textContent = d.commands.join('\n');
+    document.getElementById('auth-preview').classList.remove('hidden');
+    btn.disabled = !!d.demo;
+    if (d.demo) btn.title = 'Modo demostracion: no se envia nada';
+    return;
+  }
+  var res = document.getElementById('auth-result');
+  res.innerHTML = d.ok ? msgBox(true, 'ONU autorizada como ' + d.index + '.') : msgBox(false, d.error);
+  res.classList.remove('hidden');
+  if (d.ok) { setTimeout(function() { closeModal('auth-modal'); loadData(true); }, 1500); }
+}
+
+// ----- Detail + actions -----
+async function openDetail(index) {
+  current.detail = DATA.registered.find(function(o) { return o.onuIndex === index; });
+  document.getElementById('det-index').textContent = index;
+  document.getElementById('det-body').innerHTML = 'Consultando la ONU...';
+  document.getElementById('act-box').classList.add('hidden');
+  var t = document.getElementById('det-btn-toggle');
+  var disabled = current.detail && current.detail.adminState === 'disable';
+  t.innerHTML = disabled ? '<i class="fas fa-play mr-1"></i> Habilitar' : '<i class="fas fa-pause mr-1"></i> Deshabilitar';
+  t.onclick = function() { actionPreview(disabled ? 'enable' : 'disable'); };
+  openModal('detail-modal');
+  var d = await getJSON('/olt/api/detail?index=' + encodeURIComponent(index));
+  if (!d.ok) { document.getElementById('det-body').innerHTML = msgBox(false, d.error); return; }
+  var x = d.detail, p = d.power;
+  function row(k, v) { return '<div><p class="text-xs text-gray-500">' + k + '</p><p class="text-gray-800 font-medium">' + (v || '-') + '</p></div>'; }
+  function dbm(v) { return v === null ? '-' : v.toFixed(2) + ' dBm'; }
+  document.getElementById('det-body').innerHTML =
+    '<div class="grid grid-cols-2 sm:grid-cols-3 gap-4">' +
+      row('Cliente', current.detail ? clientHtml(current.detail.client) : '-') +
+      row('Nombre en la OLT', esc(x.name)) + row('Serial', '<span class="font-mono">' + esc(x.serial) + '</span>') +
+      row('Tipo', esc(x.type)) + row('Estado', esc(x.phaseState || x.state)) + row('Distancia', esc(x.distance)) +
+      row('Tiempo en linea', esc(x.onlineDuration)) + row('Descripcion', esc(x.description)) + row('Administracion', esc(x.adminState)) +
+    '</div>' +
+    '<div class="mt-4 rounded-lg border p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">' +
+      '<div class="col-span-2 sm:col-span-4 text-sm"><span class="text-gray-500">Señal que recibe el cliente:</span> ' +
+        '<span class="font-bold ' + SIGNAL_CLASS[d.signal.level] + '">' + dbm(p.onuRx) + ' &middot; ' + esc(d.signal.label) + '</span></div>' +
+      row('ONU recibe', dbm(p.onuRx)) + row('ONU transmite', dbm(p.onuTx)) + row('OLT recibe', dbm(p.oltRx)) + row('OLT transmite', dbm(p.oltTx)) +
+    '</div>';
+}
+var ACTION_TITLE = { reboot: 'Reiniciar la ONU', disable: 'Deshabilitar la ONU (el cliente se queda sin servicio)', enable: 'Habilitar la ONU', delete: 'Eliminar la ONU de la OLT (habra que autorizarla de nuevo)' };
+async function actionPreview(action) {
+  current.action = action;
+  var d = await postJSON('/olt/api/action', { index: document.getElementById('det-index').textContent, action: action, confirm: false });
+  var box = document.getElementById('act-box');
+  document.getElementById('act-result').classList.add('hidden');
+  if (!d.ok) { document.getElementById('act-title').textContent = d.error; document.getElementById('act-commands').textContent = ''; box.classList.remove('hidden'); return; }
+  document.getElementById('act-title').textContent = ACTION_TITLE[action] + ' - comandos:';
+  document.getElementById('act-commands').textContent = d.commands.join('\n');
+  var send = document.getElementById('act-send');
+  send.disabled = !!d.demo;
+  send.title = d.demo ? 'Modo demostracion: no se envia nada' : '';
+  box.classList.remove('hidden');
+}
+async function actionSend() {
+  if (current.action === 'delete' && !confirm('Seguro? La ONU se borra de la OLT y el cliente se queda sin servicio hasta autorizarla de nuevo.')) return;
+  var send = document.getElementById('act-send');
+  send.disabled = true; send.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Enviando...';
+  var d = await postJSON('/olt/api/action', { index: document.getElementById('det-index').textContent, action: current.action, confirm: true });
+  send.innerHTML = '<i class="fas fa-paper-plane mr-1"></i> Enviar a la OLT';
+  var res = document.getElementById('act-result');
+  res.innerHTML = d.ok ? msgBox(true, 'Listo, la OLT acepto los comandos.') : msgBox(false, d.error);
+  res.classList.remove('hidden');
+  if (d.ok) loadData(true);
+}
+
+// ----- Bulk -----
+function bulkOptions() {
+  return {
+    onuType: document.getElementById('bulk-type').value.trim(),
+    mode: document.getElementById('bulk-mode').value,
+    vlan: document.getElementById('bulk-vlan').value.trim(),
+    tcontProfile: document.getElementById('bulk-tcont').value.trim()
+  };
+}
+async function bulkPreview(keepOptions) {
+  if (!keepOptions) {
+    document.getElementById('bulk-type').value = DEFAULTS.onuType || '';
+    document.getElementById('bulk-mode').value = 'bridge';
+    document.getElementById('bulk-vlan').value = DEFAULTS.vlan || '';
+    document.getElementById('bulk-tcont').value = DEFAULTS.tcontProfile || '';
+  }
+  document.getElementById('bulk-body').innerHTML = 'Preparando...';
+  document.getElementById('bulk-send').disabled = true;
+  openModal('bulk-modal');
+  var opts = bulkOptions(); opts.confirm = false;
+  var d = await postJSON('/olt/api/bulk-authorize', opts);
+  var body = document.getElementById('bulk-body');
+  if (!d.ok) { body.innerHTML = msgBox(false, d.error); return; }
+  var html = '';
+  if (d.plan.length) {
+    html += '<p class="mb-2 text-gray-700">Se van a autorizar <b>' + d.plan.length + '</b> ONUs y guardar la configuracion al final:</p>' +
+      '<table class="w-full text-sm mb-4"><thead><tr class="text-left text-gray-500 border-b"><th class="py-1 pr-3">Serial</th><th class="py-1 pr-3">Cliente</th><th class="py-1">Queda como</th></tr></thead><tbody>' +
+      d.plan.map(function(p) { return '<tr class="border-b"><td class="py-1 pr-3 font-mono">' + esc(p.serial) + '</td><td class="py-1 pr-3">' + esc(p.client) + '</td><td class="py-1 font-mono">' + esc(p.index) + '</td></tr>'; }).join('') +
+      '</tbody></table>' +
+      '<details class="mb-4"><summary class="cursor-pointer text-indigo-600">Ver todos los comandos</summary><pre class="mt-2 bg-gray-900 text-green-300 text-xs rounded-lg p-3 overflow-auto max-h-64">' +
+      esc(d.plan.map(function(p) { return '! ' + p.client + '\n' + p.commands.join('\n'); }).join('\n\n') + '\n\nwrite') + '</pre></details>';
+  } else {
+    html += '<p class="mb-4 text-gray-700">Ninguna ONU nueva coincide con un serial guardado en el CRM.</p>';
+  }
+  if (d.skipped.length) {
+    html += '<p class="mb-1 text-gray-500">Se quedan fuera:</p><ul class="list-disc ml-5 text-gray-500">' +
+      d.skipped.map(function(s) { return '<li><span class="font-mono">' + esc(s.serial) + '</span>: ' + esc(s.reason) + '</li>'; }).join('') + '</ul>';
+  }
+  if (d.demo) html += '<p class="mt-4 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Modo demostracion: puede ver el plan pero no se envia nada.</p>';
+  body.innerHTML = html;
+  document.getElementById('bulk-send').disabled = !d.plan.length || !!d.demo;
+}
+async function bulkSend() {
+  if (!confirm('Autorizar todas estas ONUs en la OLT?')) return;
+  var btn = document.getElementById('bulk-send');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Autorizando...';
+  var opts = bulkOptions(); opts.confirm = true;
+  var d = await postJSON('/olt/api/bulk-authorize', opts);
+  btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i> Autorizar todas';
+  var body = document.getElementById('bulk-body');
+  if (!d.ok) { body.innerHTML = msgBox(false, d.error); return; }
+  var good = d.results.filter(function(r) { return r.ok; }).length;
+  body.innerHTML = msgBox(good === d.results.length, good + ' de ' + d.results.length + ' ONUs autorizadas' + (d.saved ? ' y configuracion guardada.' : '. OJO: no se pudo guardar la configuracion (write).')) +
+    '<ul class="mt-3 space-y-1">' + d.results.map(function(r) {
+      return '<li class="' + (r.ok ? 'text-emerald-700' : 'text-red-700') + '"><span class="font-mono">' + esc(r.serial) + '</span> ' + esc(r.client) + ': ' + esc(r.ok ? r.index : r.error) + '</li>';
+    }).join('') + '</ul>';
+  loadData(true);
+}
+
+// ----- Console / log / test -----
+async function runConsole(ev) {
+  ev.preventDefault();
+  var input = document.getElementById('console-cmd'), out = document.getElementById('console-out');
+  var cmd = input.value.trim(); if (!cmd) return;
+  out.textContent += '\n> ' + cmd + '\n';
+  var d = await postJSON('/olt/api/console', { command: cmd });
+  out.textContent += (d.ok ? d.output : 'ERROR: ' + d.error) + '\n';
+  out.scrollTop = out.scrollHeight;
+  input.value = '';
+}
+async function loadLog() {
+  var d = await getJSON('/olt/api/log');
+  var body = document.getElementById('log-body');
+  body.innerHTML = d.rows.length ? d.rows.map(function(r) {
+    return '<tr class="border-b"><td class="py-2 pr-4 whitespace-nowrap">' + esc(r.created_at) + '</td><td class="py-2 pr-4">' + esc(r.user_name) + '</td>' +
+      '<td class="py-2 pr-4">' + esc(r.action) + '</td><td class="py-2 pr-4 font-mono">' + esc(r.onu_index || '') + '</td>' +
+      '<td class="py-2 pr-4 font-mono">' + esc(r.serial || '') + '</td><td class="py-2">' + (r.ok ? '<span class="text-emerald-600">OK</span>' : '<span class="text-red-600">Error</span>') + '</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="py-6 text-center text-gray-400">Todavia no se ha enviado nada a la OLT</td></tr>';
+}
+async function testConnection() {
+  var box = document.getElementById('test-result');
+  box.innerHTML = msgBox(true, 'Probando conexion...'); box.classList.remove('hidden');
+  var d = await getJSON('/olt/api/test');
+  box.innerHTML = d.success ? msgBox(true, 'Conectado: ZTE ' + d.model + (d.version ? ' ' + d.version : '')) : msgBox(false, 'No se pudo conectar: ' + d.error);
+}
+
+showTab('new');
+loadData(false);
+</script>
+
+<%- include('../partials/footer') %>

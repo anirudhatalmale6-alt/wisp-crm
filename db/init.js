@@ -247,6 +247,38 @@ module.exports = function(db) {
   try { db.exec('ALTER TABLE service_cuts ADD COLUMN service_id INTEGER REFERENCES client_services(id)'); } catch(e) {}
   try { db.exec('ALTER TABLE payments ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch(e) {}
 
+  // ZTE C300/C320 OLT: where each service's ONU sits (gpon-onu_1/1/1:5)
+  try { db.exec('ALTER TABLE client_services ADD COLUMN olt_onu_index TEXT'); } catch(e) {}
+
+  // Every command sent to the ZTE OLT, with who sent it and what it answered
+  db.exec(`CREATE TABLE IF NOT EXISTS olt_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_name TEXT,
+    action TEXT NOT NULL,
+    onu_index TEXT,
+    serial TEXT,
+    commands TEXT,
+    output TEXT,
+    ok INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  const zteDefaults = [
+    ['zte_host', '', 'IP de la OLT ZTE (C300/C320)'],
+    ['zte_port', '23', 'Puerto Telnet/SSH de la OLT ZTE'],
+    ['zte_transport', 'telnet', 'Conexion a la OLT ZTE: telnet o ssh'],
+    ['zte_user', '', 'Usuario de la OLT ZTE'],
+    ['zte_pass', '', 'Clave de la OLT ZTE'],
+    ['zte_enable_pass', '', 'Clave de enable (si la OLT la pide)'],
+    ['zte_default_vlan', '', 'VLAN de internet por defecto'],
+    ['zte_default_onu_type', 'ZTE-F660', 'Tipo de ONU por defecto'],
+    ['zte_tcont_profile', '', 'Perfil T-CONT por defecto']
+  ];
+  for (const [key, value, description] of zteDefaults) {
+    try { db.prepare('INSERT OR IGNORE INTO settings (key, value, description) VALUES (?, ?, ?)').run(key, value, description); } catch(e) {}
+  }
+
   // Create default admin user
   const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!admin) {

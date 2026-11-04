@@ -305,6 +305,92 @@
     </form>
   </div>
 
+  <!-- ZTE C300/C320 OLT -->
+  <div class="bg-white rounded-xl shadow-sm border" id="zte">
+    <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl flex items-center justify-between">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-server text-indigo-600"></i> OLT ZTE (C300 / C320)
+      </h3>
+      <a href="/olt" class="text-sm text-indigo-600 hover:underline">Abrir panel OLT ZTE</a>
+    </div>
+    <form method="POST" action="/settings/zte" class="p-5">
+      <p class="text-xs text-gray-500 mb-4">
+        Es independiente de la OLT actual de arriba: puede configurar la ZTE sin afectar la que ya funciona.
+        Mientras la IP este vacia, el panel OLT ZTE funciona en modo demostracion.
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="zte_host" class="block text-sm font-medium text-gray-700 mb-1">IP de la OLT</label>
+          <input type="text" id="zte_host" name="zte_host" value="<%= sv('zte_host') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="192.168.25.50">
+        </div>
+        <div>
+          <label for="zte_transport" class="block text-sm font-medium text-gray-700 mb-1">Conexion</label>
+          <select id="zte_transport" name="zte_transport"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="telnet" <%= sv('zte_transport') !== 'ssh' ? 'selected' : '' %>>Telnet</option>
+            <option value="ssh" <%= sv('zte_transport') === 'ssh' ? 'selected' : '' %>>SSH</option>
+          </select>
+        </div>
+        <div>
+          <label for="zte_port" class="block text-sm font-medium text-gray-700 mb-1">Puerto</label>
+          <input type="number" id="zte_port" name="zte_port" value="<%= sv('zte_port') || '23' %>" min="1" max="65535"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="23">
+        </div>
+        <div>
+          <label for="zte_user" class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+          <input type="text" id="zte_user" name="zte_user" value="<%= sv('zte_user') %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="zte">
+        </div>
+        <div>
+          <label for="zte_pass" class="block text-sm font-medium text-gray-700 mb-1">Clave</label>
+          <div class="relative">
+            <input type="password" id="zte_pass" name="zte_pass" value="<%= sv('zte_pass') %>"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="••••••••">
+            <button type="button" onclick="toggleField('zte_pass')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div>
+          <label for="zte_enable_pass" class="block text-sm font-medium text-gray-700 mb-1">Clave de enable <span class="text-gray-400 font-normal">(opcional)</span></label>
+          <div class="relative">
+            <input type="password" id="zte_enable_pass" name="zte_enable_pass" value="<%= sv('zte_enable_pass') %>"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="si la OLT la pide">
+            <button type="button" onclick="toggleField('zte_enable_pass')" class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-5 pt-4 border-t">
+        <p class="text-sm font-medium text-gray-700 mb-3">Valores por defecto al autorizar una ONU</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label for="zte_default_vlan" class="block text-sm font-medium text-gray-700 mb-1">VLAN de internet</label>
+            <input type="text" id="zte_default_vlan" name="zte_default_vlan" value="<%= sv('zte_default_vlan') %>"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="100">
+          </div>
+          <div>
+            <label for="zte_default_onu_type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de ONU</label>
+            <input type="text" id="zte_default_onu_type" name="zte_default_onu_type" value="<%= sv('zte_default_onu_type') || 'ZTE-F660' %>" list="zte-onu-types"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono">
+            <datalist id="zte-onu-types">
+              <option value="ZTE-F660"><option value="ZTE-F670L"><option value="ZTE-F601"><option value="ZTE-F680"><option value="ALL-ONT">
+            </datalist>
+          </div>
+          <div>
+            <label for="zte_tcont_profile" class="block text-sm font-medium text-gray-700 mb-1">Perfil T-CONT</label>
+            <input type="text" id="zte_tcont_profile" name="zte_tcont_profile" value="<%= sv('zte_tcont_profile') %>"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="ej: 1G">
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Los nombres de tipo de ONU y de perfil T-CONT tienen que existir en la OLT. Se confirman el dia de la instalacion.</p>
+      </div>
+      <div class="flex justify-end mt-5 pt-4 border-t">
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-save mr-1"></i> Guardar OLT ZTE
+        </button>
+      </div>
+    </form>
+  </div>
+
   <!-- Templates -->
   <div class="bg-white rounded-xl shadow-sm border">
     <div class="px-5 py-4 border-b bg-gray-50 rounded-t-xl">

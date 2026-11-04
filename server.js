@@ -68,6 +68,7 @@ const mikrotikRoutes = require('./routes/mikrotik')(db);
 const usersRoutes = require('./routes/users')(db);
 const onuRoutes = require('./routes/onu')(db);
 const ticketRoutes = require('./routes/tickets')(db);
+const oltRoutes = require('./routes/olt')(db);
 
 // Public receipt page (no auth required - accessed by clients via WhatsApp link)
 app.get('/receipt/:token', (req, res) => {
@@ -115,6 +116,7 @@ app.use('/settings', requireAuth, requireAdmin, settingsRoutes);
 app.use('/users', requireAuth, requireAdmin, usersRoutes);
 app.use('/onu', requireAuth, onuRoutes);
 app.use('/tickets', requireAuth, ticketRoutes);
+app.use('/olt', requireAuth, requireAdmin, oltRoutes);
 
 // Client map
 app.get('/map', requireAuth, (req, res) => {

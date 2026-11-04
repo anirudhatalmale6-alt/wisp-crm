@@ -76,6 +76,29 @@ module.exports = function(db) {
     res.redirect('/settings');
   });
 
+  // Update ZTE C300/C320 OLT settings (kept apart from the current OLT so both
+  // can run side by side on the night of the swap)
+  router.post('/zte', (req, res) => {
+    const b = req.body;
+    const fields = ['zte_host', 'zte_port', 'zte_user', 'zte_pass', 'zte_enable_pass',
+      'zte_default_vlan', 'zte_default_onu_type', 'zte_tcont_profile'];
+    const update = db.prepare('INSERT OR REPLACE INTO settings (key, value, description) VALUES (?, ?, ?)');
+    const desc = (key) => {
+      const r = db.prepare('SELECT description FROM settings WHERE key = ?').get(key);
+      return r ? r.description : key.replace(/_/g, ' ');
+    };
+    if (b.zte_default_vlan && !/^\d{1,4}$/.test(String(b.zte_default_vlan).trim())) {
+      req.session.error = 'La VLAN debe ser un numero entre 1 y 4094';
+      return res.redirect('/settings');
+    }
+    for (const key of fields) {
+      if (b[key] !== undefined) update.run(key, String(b[key]).trim(), desc(key));
+    }
+    update.run('zte_transport', b.zte_transport === 'ssh' ? 'ssh' : 'telnet', desc('zte_transport'));
+    req.session.success = 'Configuracion de la OLT ZTE actualizada';
+    res.redirect('/settings');
+  });
+
   // Update message template
   router.post('/templates/:id', (req, res) => {
     const { content } = req.body;
