@@ -512,6 +512,10 @@ module.exports = function(db) {
     db.transaction(() => {
       db.prepare("UPDATE clients SET archived_at = NULL, archived_reason = NULL, status = 'suspended' WHERE id = ?")
         .run(client.id);
+      // Archiving parked the services as 'inactive'; bring them back suspended
+      // like the client, so "Reconectar" can switch them on again
+      db.prepare("UPDATE client_services SET status = 'suspended' WHERE client_id = ? AND status = 'inactive'")
+        .run(client.id);
       db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'unarchive', 'Cliente restaurado', 0)")
         .run(client.id);
     })();

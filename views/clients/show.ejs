@@ -258,7 +258,7 @@
                   <i class="fas fa-ban text-xs"></i>
                 </button>
               </form>
-            <% } else if (svc.status === 'suspended') { %>
+            <% } else if (svc.status === 'suspended' || (svc.status === 'inactive' && !client.archived_at)) { %>
               <form method="POST" action="/mikrotik/reconnect/<%= client.id %>?service_id=<%= svc.id %>" class="inline"
                 onsubmit="return confirm('Reconectar este servicio?')">
                 <button type="submit" class="text-green-600 hover:bg-green-50 p-1.5 rounded" title="Reconectar">

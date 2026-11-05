@@ -32,7 +32,7 @@ module.exports = function(db) {
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
 
-    const serviceId = req.query.service_id || req.body.service_id;
+    const serviceId = req.query.service_id || (req.body || {}).service_id;
     if (serviceId) {
       // Cut specific service
       const svc = db.prepare('SELECT * FROM client_services WHERE id = ? AND client_id = ?').get(serviceId, client.id);
@@ -40,7 +40,7 @@ module.exports = function(db) {
 
       db.prepare("UPDATE client_services SET status = 'suspended' WHERE id = ?").run(svc.id);
       db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'cut', ?, 0)").run(
-        client.id, svc.id, req.body.reason || 'Corte manual'
+        client.id, svc.id, (req.body || {}).reason || 'Corte manual'
       );
 
       // If all services suspended, suspend client too
@@ -59,7 +59,7 @@ module.exports = function(db) {
       db.prepare("UPDATE clients SET status = 'suspended' WHERE id = ?").run(client.id);
       db.prepare("UPDATE client_services SET status = 'suspended' WHERE client_id = ? AND status = 'active'").run(client.id);
       db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'cut', ?, 0)").run(
-        client.id, req.body.reason || 'Corte manual'
+        client.id, (req.body || {}).reason || 'Corte manual'
       );
 
       const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client.id);
@@ -92,8 +92,12 @@ module.exports = function(db) {
     }
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.clientId);
     if (!client) return res.redirect('/clients');
+    if (client.archived_at) {
+      req.session.error = 'Este cliente esta archivado. Restaurelo primero y despues reconecte.';
+      return res.redirect('/clients/' + client.id);
+    }
 
-    const serviceId = req.query.service_id || req.body.service_id;
+    const serviceId = req.query.service_id || (req.body || {}).service_id;
     if (serviceId) {
       // Reconnect specific service
       const svc = db.prepare('SELECT * FROM client_services WHERE id = ? AND client_id = ?').get(serviceId, client.id);
@@ -102,7 +106,7 @@ module.exports = function(db) {
       db.prepare("UPDATE client_services SET status = 'active' WHERE id = ?").run(svc.id);
       db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client.id);
       db.prepare("INSERT INTO service_cuts (client_id, service_id, action, reason, automatic) VALUES (?, ?, 'reconnect', ?, 0)").run(
-        client.id, svc.id, req.body.reason || 'Reconexión manual'
+        client.id, svc.id, (req.body || {}).reason || 'Reconexión manual'
       );
 
       db.prepare(`INSERT INTO mikrotik_queue (client_id, service_id, action, pppoe_user, ip_address, connection_type, client_name)
@@ -113,9 +117,11 @@ module.exports = function(db) {
     } else {
       // Reconnect all services (legacy behavior)
       db.prepare("UPDATE clients SET status = 'active' WHERE id = ?").run(client.id);
-      db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status = 'suspended'").run(client.id);
+      // 'inactive' only comes from archiving; a restored client's services
+      // must come back with it
+      db.prepare("UPDATE client_services SET status = 'active' WHERE client_id = ? AND status IN ('suspended', 'inactive')").run(client.id);
       db.prepare("INSERT INTO service_cuts (client_id, action, reason, automatic) VALUES (?, 'reconnect', ?, 0)").run(
-        client.id, req.body.reason || 'Reconexión manual'
+        client.id, (req.body || {}).reason || 'Reconexión manual'
       );
 
       const services = db.prepare('SELECT * FROM client_services WHERE client_id = ?').all(client.id);
